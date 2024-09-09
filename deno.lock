@@ -5,6 +5,8 @@
       "jsr:@cross/runtime@^1.0.0": "jsr:@cross/runtime@1.1.0",
       "jsr:@cross/runtime@^1.1.0": "jsr:@cross/runtime@1.1.0",
       "jsr:@cross/test@^0.0.9": "jsr:@cross/test@0.0.9",
+      "jsr:@es-toolkit/es-toolkit": "jsr:@es-toolkit/es-toolkit@1.17.0",
+      "jsr:@es-toolkit/es-toolkit@^1.17.0": "jsr:@es-toolkit/es-toolkit@1.17.0",
       "jsr:@std/assert@^1.0.4": "jsr:@std/assert@1.0.4",
       "jsr:@std/internal@^1.0.3": "jsr:@std/internal@1.0.3",
       "jsr:@std/json@^1.0.0": "jsr:@std/json@1.0.0",
@@ -21,6 +23,9 @@
         "dependencies": [
           "jsr:@cross/runtime@^1.0.0"
         ]
+      },
+      "@es-toolkit/es-toolkit@1.17.0": {
+        "integrity": "dfbefedc4c821c97dbbfe33a716b4b34d486f2c214dce3b7c3f8161344d2e72a"
       },
       "@std/assert@1.0.4": {
         "integrity": "d4c767ea578e5bc09c15b6e503376003e5b2d1f4c0cdf08524a92101ff4d7b96",
@@ -56,6 +61,7 @@
     "dependencies": [
       "jsr:@cross/runtime@^1.1.0",
       "jsr:@cross/test@^0.0.9",
+      "jsr:@es-toolkit/es-toolkit@^1.17.0",
       "jsr:@std/assert@^1.0.4",
       "jsr:@std/jsonc@^1.0.1",
       "jsr:@std/yaml@^1.0.5"

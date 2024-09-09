@@ -45,7 +45,7 @@ async function denoLoadDirectoryContents(
 ): Promise<DirectoryEntry[]> {
   const entries: DirectoryEntry[] = [];
 
-  const pathWithSlash = new URL(path.href + '/');
+  const pathWithSlash = new URL(path.href + "/");
 
   for await (const dirEntry of Deno.readDir(path)) {
     options?.signal?.throwIfAborted();

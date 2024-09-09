@@ -1,6 +1,8 @@
 import { CurrentRuntime, Runtime } from "@cross/runtime";
 import type {
   DirectoryContentsReader,
+  DirectoryObjectLoader,
+  DirectoryObjectLoaderOptions,
   FileTextLoader,
   FileValueLoader,
   FileValueLoaderOptions,
@@ -8,6 +10,10 @@ import type {
 } from "./interfaces.ts";
 import * as JSONC from "@std/jsonc";
 import * as YAML from "@std/yaml";
+import {
+  genericLoadObjectFromDirectory,
+  validateLoaders,
+} from "./directory_loader.ts";
 
 const nodeLikeRuntimes = [Runtime.Bun, Runtime.Node];
 
@@ -88,6 +94,40 @@ export function newYamlFileValueLoader(
     ) => {
       const text = await textLoader.loadTextFromFile(path, options);
       return YAML.parse(text);
+    },
+  }));
+}
+
+export async function newDefaultFileValueLoaders(): Promise<
+  Map<string, FileValueLoader>
+> {
+  const textLoader = await newFileTextLoader();
+  return new Map<string, FileValueLoader>([
+    [".json", await newJsonFileValueLoader(textLoader)],
+    [".jsonc", await newJsonWithCommentsFileValueLoader(textLoader)],
+    [".yaml", await newYamlFileValueLoader(textLoader)],
+  ]);
+}
+
+export function newDirectoryObjectLoader(
+  loaders: Iterable<Readonly<[string, FileValueLoader]>>,
+  directoryReader: DirectoryContentsReader,
+): Promise<DirectoryObjectLoader> {
+  return Promise.resolve<DirectoryObjectLoader>(Object.freeze({
+    name: "Generic directory object loader",
+    _loaders: loaders, // Not used. Just present to make code easier to debug.
+    loadObjectFromDirectory: (
+      path: URL,
+      options?: DirectoryObjectLoaderOptions,
+    ) => {
+      const clonedLoaders = Array.from(loaders);
+      validateLoaders(clonedLoaders);
+      return genericLoadObjectFromDirectory(
+        path,
+        clonedLoaders,
+        directoryReader,
+        options,
+      );
     },
   }));
 }

@@ -16,11 +16,7 @@ async function direntToType(
 ): Promise<DirectoryEntryType> {
   if (dirent.isSymbolicLink() && options?.includeSymlinks) {
     const info = await fsPromises.stat(direntUrl);
-    return info.isFile()
-    ? "file"
-      : info.isDirectory()
-    ? "directory"
-        : "other";
+    return info.isFile() ? "file" : info.isDirectory() ? "directory" : "other";
   }
 
   return dirent.isFile()

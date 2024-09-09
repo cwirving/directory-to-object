@@ -1,7 +1,7 @@
 import { test } from "@cross/test";
 import { assert, assertEquals, assertExists } from "@std/assert";
 import { newDirectoryContentsReader, newFileTextLoader } from "./factories.ts";
-import { DirectoryEntry } from "./interfaces.ts";
+import type { DirectoryEntry } from "./interfaces.ts";
 
 test("newFileTextLoader: load a file", async () => {
   const loader = await newFileTextLoader();

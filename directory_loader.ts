@@ -105,5 +105,5 @@ export async function genericLoadObjectFromDirectory(
         break;
     }
   }
-  return {};
+  return result;
 }

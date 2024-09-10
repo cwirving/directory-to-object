@@ -1,6 +1,13 @@
 import { test } from "@cross/test";
-import type { FileValueLoader, FileValueLoaderOptions } from "./interfaces.ts";
+import type {
+  DirectoryContentsReader,
+  DirectoryContentsReaderOptions,
+  DirectoryEntry,
+  FileValueLoader,
+  FileValueLoaderOptions,
+} from "./interfaces.ts";
 import {
+  genericLoadObjectFromDirectory,
   isRecord,
   loadValueFromFile,
   setOrMergeValue,
@@ -20,14 +27,14 @@ const neverCalledFileValueLoader: FileValueLoader = {
 
 class MockFileValueLoader implements FileValueLoader {
   readonly name: string;
-  readonly value: unknown;
+  readonly contents: Record<string, unknown>;
   callCount = 0;
   lastPath: URL | undefined;
   lastOptions: FileValueLoaderOptions | undefined;
 
-  constructor(name: string, value: unknown) {
+  constructor(name: string, contents: Record<string, unknown>) {
     this.name = name;
-    this.value = value;
+    this.contents = contents;
   }
 
   loadValueFromFile(
@@ -37,7 +44,37 @@ class MockFileValueLoader implements FileValueLoader {
     this.lastPath = path;
     this.lastOptions = options;
     this.callCount += 1;
-    return Promise.resolve(this.value);
+
+    const result = this.contents[path.href];
+    if (!result) {
+      throw new Error(`Unknown URL in mock file value loader: "${path.href}"`);
+    }
+
+    return Promise.resolve(result);
+  }
+}
+
+class MockDirectoryContentsReader implements DirectoryContentsReader {
+  readonly name: string;
+  readonly contents: Record<string, DirectoryEntry[]>;
+
+  constructor(name: string, contents: Record<string, DirectoryEntry[]>) {
+    this.name = name;
+    this.contents = contents;
+  }
+
+  loadDirectoryContents(
+    path: URL,
+    _options?: DirectoryContentsReaderOptions,
+  ): Promise<DirectoryEntry[]> {
+    const result = this.contents[path.href];
+    if (!result) {
+      throw new Error(
+        `Unknown URL in mock directory contents reader: "${path.href}"`,
+      );
+    }
+
+    return Promise.resolve(result);
   }
 }
 
@@ -128,9 +165,11 @@ test("setOrMergeValue merge cases from es-toolkit documentation", () => {
 });
 
 test("loadValueFromFile honors loader iteration order", async () => {
-  const loader1 = new MockFileValueLoader("loader 1", 1);
-  const loader2 = new MockFileValueLoader("loader 2", 2);
-  const loader3 = new MockFileValueLoader("loader 3", 3);
+  const loader1 = new MockFileValueLoader("loader 1", { "file:///foo.c": 1 });
+  const loader2 = new MockFileValueLoader("loader 2", { "file:///foo.b.c": 2 });
+  const loader3 = new MockFileValueLoader("loader 3", {
+    "file:///foo.a.b.c": 3,
+  });
 
   const loaders: [string, FileValueLoader][] = [
     [".a.b.c", loader3],
@@ -179,11 +218,62 @@ test("loadValueFromFile honors loader iteration order", async () => {
 });
 
 test("loadValueFromFile returns undefined on no match", async () => {
-  const loader1 = new MockFileValueLoader("loader 1", 1);
+  const loader1 = new MockFileValueLoader("loader 1", { "file:///foo.c": 1 });
 
   const loaders: [string, FileValueLoader][] = [
     [".c", loader1],
   ];
 
-  assertEquals(await loadValueFromFile("foo.xyz", new URL("file:///foo.xyz"), loaders), undefined);
+  assertEquals(
+    await loadValueFromFile("foo.xyz", new URL("file:///foo.xyz"), loaders),
+    undefined,
+  );
+});
+
+test("genericLoadObjectFromDirectory", async () => {
+  const loader = new MockFileValueLoader("loader", {
+    "file:///dir/a.txt": "a",
+    "file:///dir/b.txt": "b",
+    "file:///dir/c/d.txt": "d",
+  });
+  const loaders: [string, FileValueLoader][] = [[".txt", loader]];
+
+  const reader = new MockDirectoryContentsReader("reader", {
+    "file:///dir": [{
+      name: "a.txt",
+      type: "file",
+      url: new URL("file:///dir/a.txt"),
+    }, {
+      name: "b.txt",
+      type: "file",
+      url: new URL("file:///dir/b.txt"),
+    }, {
+      name: "c",
+      type: "directory",
+      url: new URL("file:///dir/c"),
+    }, {
+      name: "x",
+      type: "other",
+      url: new URL("file:///dir/x"),
+    }],
+    "file:///dir/c": [{
+      name: "d.txt",
+      type: "file",
+      url: new URL("file:///dir/c/d.txt"),
+    }],
+  });
+
+  const result = await genericLoadObjectFromDirectory(
+    new URL("file:///dir"),
+    loaders,
+    reader,
+  );
+
+  assertEquals(result, {
+    a: "a",
+    b: "b",
+    c: {
+      d: "d",
+    },
+  });
 });

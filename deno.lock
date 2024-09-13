@@ -9,9 +9,6 @@
       "jsr:@es-toolkit/es-toolkit@^1.17.0": "jsr:@es-toolkit/es-toolkit@1.17.0",
       "jsr:@std/assert@^1.0.4": "jsr:@std/assert@1.0.4",
       "jsr:@std/internal@^1.0.3": "jsr:@std/internal@1.0.3",
-      "jsr:@std/json@^1.0.0": "jsr:@std/json@1.0.0",
-      "jsr:@std/jsonc@^1.0.1": "jsr:@std/jsonc@1.0.1",
-      "jsr:@std/yaml@^1.0.5": "jsr:@std/yaml@1.0.5",
       "npm:@types/node": "npm:@types/node@18.16.19"
     },
     "jsr": {
@@ -35,18 +32,6 @@
       },
       "@std/internal@1.0.3": {
         "integrity": "208e9b94a3d5649bd880e9ca38b885ab7651ab5b5303a56ed25de4755fb7b11e"
-      },
-      "@std/json@1.0.0": {
-        "integrity": "985c1e544918d42e4e84072fc739ac4a19c3a5093292c99742ffcdd03fb6a268"
-      },
-      "@std/jsonc@1.0.1": {
-        "integrity": "6b36956e2a7cbb08ca5ad7fbec72e661e6217c202f348496ea88747636710dda",
-        "dependencies": [
-          "jsr:@std/json@^1.0.0"
-        ]
-      },
-      "@std/yaml@1.0.5": {
-        "integrity": "71ba3d334305ee2149391931508b2c293a8490f94a337eef3a09cade1a2a2742"
       }
     },
     "npm": {
@@ -62,9 +47,7 @@
       "jsr:@cross/runtime@^1.1.0",
       "jsr:@cross/test@^0.0.9",
       "jsr:@es-toolkit/es-toolkit@^1.17.0",
-      "jsr:@std/assert@^1.0.4",
-      "jsr:@std/jsonc@^1.0.1",
-      "jsr:@std/yaml@^1.0.5"
+      "jsr:@std/assert@^1.0.4"
     ]
   }
 }

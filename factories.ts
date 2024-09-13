@@ -8,8 +8,6 @@ import type {
   FileValueLoaderOptions,
   Platform,
 } from "./interfaces.ts";
-import * as JSONC from "@std/jsonc";
-import * as YAML from "@std/yaml";
 import {
   genericLoadObjectFromDirectory,
   validateLoaders,
@@ -53,49 +51,33 @@ export function newTextFileValueLoader(
   }));
 }
 
+export type StringParserFunc = (input: string) => unknown;
+
+export function newStringParserFileValueLoader(
+  textLoader: FileTextLoader,
+  parser: StringParserFunc,
+  name: string,
+): Promise<FileValueLoader> {
+  return Promise.resolve<FileValueLoader>(Object.freeze({
+    name: name,
+    loadValueFromFile: async (
+      path: URL,
+      options?: FileValueLoaderOptions,
+    ) => {
+      const text = await textLoader.loadTextFromFile(path, options);
+      return parser(text);
+    },
+  }));
+}
+
 export function newJsonFileValueLoader(
   textLoader: FileTextLoader,
 ): Promise<FileValueLoader> {
-  return Promise.resolve<FileValueLoader>(Object.freeze({
-    name: "JSON file value loader",
-    loadValueFromFile: async (
-      path: URL,
-      options?: FileValueLoaderOptions,
-    ) => {
-      const text = await textLoader.loadTextFromFile(path, options);
-      return JSON.parse(text);
-    },
-  }));
-}
-
-export function newJsonWithCommentsFileValueLoader(
-  textLoader: FileTextLoader,
-): Promise<FileValueLoader> {
-  return Promise.resolve<FileValueLoader>(Object.freeze({
-    name: "JSONC file value loader",
-    loadValueFromFile: async (
-      path: URL,
-      options?: FileValueLoaderOptions,
-    ) => {
-      const text = await textLoader.loadTextFromFile(path, options);
-      return JSONC.parse(text);
-    },
-  }));
-}
-
-export function newYamlFileValueLoader(
-  textLoader: FileTextLoader,
-): Promise<FileValueLoader> {
-  return Promise.resolve<FileValueLoader>(Object.freeze({
-    name: "YAML file value loader",
-    loadValueFromFile: async (
-      path: URL,
-      options?: FileValueLoaderOptions,
-    ) => {
-      const text = await textLoader.loadTextFromFile(path, options);
-      return YAML.parse(text);
-    },
-  }));
+  return newStringParserFileValueLoader(
+    textLoader,
+    JSON.parse,
+    "JSON file value loader",
+  );
 }
 
 export async function newDefaultFileValueLoaders(): Promise<
@@ -104,8 +86,7 @@ export async function newDefaultFileValueLoaders(): Promise<
   const textLoader = await newFileTextLoader();
   return new Map<string, FileValueLoader>([
     [".json", await newJsonFileValueLoader(textLoader)],
-    [".jsonc", await newJsonWithCommentsFileValueLoader(textLoader)],
-    [".yaml", await newYamlFileValueLoader(textLoader)],
+    [".txt", await newTextFileValueLoader(textLoader)],
   ]);
 }
 

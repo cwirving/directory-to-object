@@ -3,6 +3,7 @@ import type {
   DirectoryContentsReader,
   DirectoryObjectLoader,
   DirectoryObjectLoaderOptions,
+  FileBinaryLoader,
   FileTextLoader,
   FileValueLoader,
   FileValueLoaderOptions,
@@ -31,6 +32,10 @@ export async function newFileTextLoader(): Promise<FileTextLoader> {
   return (await getCurrentPlatform()).fileTextLoader;
 }
 
+export async function newFileBinaryLoader(): Promise<FileBinaryLoader> {
+  return (await getCurrentPlatform()).fileBinaryLoader;
+}
+
 export async function newDirectoryContentsReader(): Promise<
   DirectoryContentsReader
 > {
@@ -46,6 +51,7 @@ export function newTextFileValueLoader(
       path: URL,
       options?: FileValueLoaderOptions,
     ) => {
+      options?.signal?.throwIfAborted();
       return textLoader.loadTextFromFile(path, options);
     },
   }));
@@ -64,6 +70,7 @@ export function newStringParserFileValueLoader(
       path: URL,
       options?: FileValueLoaderOptions,
     ) => {
+      options?.signal?.throwIfAborted();
       const text = await textLoader.loadTextFromFile(path, options);
       return parser(text);
     },
@@ -101,6 +108,7 @@ export function newDirectoryObjectLoader(
       path: URL,
       options?: DirectoryObjectLoaderOptions,
     ) => {
+      options?.signal?.throwIfAborted();
       const clonedLoaders = Array.from(loaders);
       validateLoaders(clonedLoaders);
       return genericLoadObjectFromDirectory(

@@ -2,6 +2,7 @@ import type {
   DirectoryContentsReaderOptions,
   DirectoryEntry,
   DirectoryEntryType,
+  FileBinaryLoaderOptions,
   FileTextLoaderOptions,
   Platform,
 } from "./interfaces.ts";
@@ -39,6 +40,13 @@ function denoLoadTextFromFile(
   return Deno.readTextFile(path, options);
 }
 
+function denoLoadBinaryFromFile(
+  path: URL,
+  options?: FileBinaryLoaderOptions,
+): Promise<Uint8Array> {
+  return Deno.readFile(path, options);
+}
+
 async function denoLoadDirectoryContents(
   path: URL,
   options?: DirectoryContentsReaderOptions,
@@ -64,6 +72,10 @@ export const platform: Platform = Object.freeze({
   fileTextLoader: {
     name: "Deno.readTextFile",
     loadTextFromFile: denoLoadTextFromFile,
+  },
+  fileBinaryLoader: {
+    name: "Deno.readFile",
+    loadBinaryFromFile: denoLoadBinaryFromFile,
   },
   directoryContentsReader: {
     name: "Deno.readDir",

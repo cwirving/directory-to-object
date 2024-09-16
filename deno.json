@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "exports": "./mod.ts",
   "tasks": {
-    "test": "deno test --allow-read *.test.ts"
+    "test": "deno test --coverage --allow-read *.test.ts"
   },
   "license": "MIT",
   "imports": {

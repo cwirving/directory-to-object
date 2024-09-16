@@ -17,6 +17,17 @@ export interface FileTextLoader {
   ): Promise<string>;
 }
 
+export interface FileBinaryLoaderOptions extends WithOptionalSignal {
+}
+
+export interface FileBinaryLoader {
+  name: string;
+  loadBinaryFromFile(
+    path: URL,
+    options?: FileTextLoaderOptions,
+  ): Promise<Uint8Array>;
+}
+
 export type DirectoryEntryType = "file" | "directory" | "other";
 
 export interface DirectoryEntry {
@@ -61,5 +72,6 @@ export interface DirectoryObjectLoader {
 
 export interface Platform {
   fileTextLoader: FileTextLoader;
+  fileBinaryLoader: FileBinaryLoader;
   directoryContentsReader: DirectoryContentsReader;
 }

@@ -2,6 +2,7 @@ import type {
   DirectoryContentsReaderOptions,
   DirectoryEntry,
   DirectoryEntryType,
+  FileBinaryLoaderOptions,
   FileTextLoaderOptions,
   Platform,
 } from "./interfaces.ts";
@@ -36,6 +37,16 @@ function nodeLoadTextFromFile(
   });
 }
 
+function nodeLoadBinaryFromFile(
+  path: URL,
+  options?: FileBinaryLoaderOptions,
+): Promise<Uint8Array> {
+  return fsPromises.readFile(path, {
+    encoding: null,
+    signal: (options as Abortable | undefined)?.signal,
+  });
+}
+
 async function nodeLoadDirectoryContents(
   path: URL,
   options?: DirectoryContentsReaderOptions,
@@ -58,8 +69,12 @@ async function nodeLoadDirectoryContents(
 
 export const platform: Platform = Object.freeze({
   fileTextLoader: {
-    name: "fs.readFile",
+    name: "fs.readFile (utf-8)",
     loadTextFromFile: nodeLoadTextFromFile,
+  },
+  fileBinaryLoader: {
+    name: "fs.readFile (binary)",
+    loadBinaryFromFile: nodeLoadBinaryFromFile,
   },
   directoryContentsReader: {
     name: "fs.readdir",

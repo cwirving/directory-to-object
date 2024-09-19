@@ -57,6 +57,21 @@ export function newTextFileValueLoader(
   }));
 }
 
+export function newBinaryFileValueLoader(
+  binaryLoader: FileBinaryLoader,
+): Promise<FileValueLoader> {
+  return Promise.resolve<FileValueLoader>(Object.freeze({
+    name: "Binary file value loader",
+    loadValueFromFile: (
+      path: URL,
+      options?: FileValueLoaderOptions,
+    ) => {
+      options?.signal?.throwIfAborted();
+      return binaryLoader.loadBinaryFromFile(path, options);
+    },
+  }));
+}
+
 export type StringParserFunc = (input: string) => unknown;
 
 export function newStringParserFileValueLoader(
@@ -97,11 +112,19 @@ export async function newDefaultFileValueLoaders(): Promise<
   ]);
 }
 
-export function newDirectoryObjectLoader(
-  loaders: Iterable<Readonly<[string, FileValueLoader]>>,
-  directoryReader: DirectoryContentsReader,
+export async function newDirectoryObjectLoader(
+  loaders?: Iterable<Readonly<[string, FileValueLoader]>>,
+  directoryReader?: DirectoryContentsReader,
 ): Promise<DirectoryObjectLoader> {
-  return Promise.resolve<DirectoryObjectLoader>(Object.freeze({
+  if (loaders === undefined) {
+    loaders = await newDefaultFileValueLoaders();
+  }
+
+  if (directoryReader === undefined) {
+    directoryReader = await newDirectoryContentsReader();
+  }
+
+  return Object.freeze({
     name: "Generic directory object loader",
     _loaders: loaders, // Not used. Just present to make code easier to debug.
     loadObjectFromDirectory: (
@@ -118,5 +141,5 @@ export function newDirectoryObjectLoader(
         options,
       );
     },
-  }));
+  });
 }

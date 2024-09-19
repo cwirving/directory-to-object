@@ -1,8 +1,10 @@
 import { test } from "@cross/test";
 import { assert, assertEquals, assertExists, assertRejects } from "@std/assert";
 import {
+  newBinaryFileValueLoader,
   newDefaultFileValueLoaders,
   newDirectoryContentsReader,
+  newDirectoryObjectLoader,
   newFileBinaryLoader,
   newFileTextLoader,
 } from "./factories.ts";
@@ -186,4 +188,46 @@ test("newDefaultFileValueLoaders: returns the expected defaults", async () => {
       );
     });
   }
+});
+
+test("newDirectoryObjectLoader reads SimpleDirectory", async () => {
+  const directoryLoader = await newDirectoryObjectLoader();
+
+  const directoryUrl = new URL("test_data/SimpleDirectory", import.meta.url);
+  const contents = await directoryLoader.loadObjectFromDirectory(directoryUrl);
+
+  assertEquals(contents, {
+    json: {
+      foo: "bar",
+    },
+    text: "This is a test\n",
+  });
+});
+
+test("newDirectoryObjectLoader reads CompleteDirectory", async () => {
+  const loaders = await newDefaultFileValueLoaders();
+
+  // Also demonstrate how to add additional loaders:
+  const binaryLoader = await newFileBinaryLoader();
+  loaders.set(".bin", await newBinaryFileValueLoader(binaryLoader));
+
+  const directoryLoader = await newDirectoryObjectLoader(
+    loaders,
+    await newDirectoryContentsReader(),
+  );
+
+  const directoryUrl = new URL("test_data/CompleteDirectory", import.meta.url);
+  const contents = await directoryLoader.loadObjectFromDirectory(directoryUrl);
+
+  assertEquals(contents, {
+    binary: new Uint8Array([0, 255, 0, 255]),
+    test: "This is a test!\n",
+    subdirectory: {
+      another: "value",
+      nested: {
+        key: "value",
+        key2: "value2",
+      },
+    },
+  });
 });

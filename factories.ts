@@ -1,100 +1,83 @@
-import { CurrentRuntime, Runtime } from "@cross/runtime";
 import type {
   DirectoryContentsReader,
   DirectoryObjectLoader,
   DirectoryObjectLoaderOptions,
-  FileBinaryLoader,
-  FileTextLoader,
+  FileBinaryReader,
+  FileTextReader,
   FileValueLoader,
   FileValueLoaderOptions,
-  Platform,
 } from "./interfaces.ts";
 import {
   genericLoadObjectFromDirectory,
   validateLoaders,
 } from "./directory_loader.ts";
+import { platform } from './platform.ts';
 
-const nodeLikeRuntimes = [Runtime.Bun, Runtime.Node];
-
-async function getCurrentPlatform(): Promise<Platform> {
-  if (CurrentRuntime === Runtime.Deno) {
-    const platformModule = await import("./platform_deno.ts");
-    return platformModule.platform;
-  } else if (nodeLikeRuntimes.includes(CurrentRuntime)) {
-    const platformModule = await import("./platform_node.ts");
-    return platformModule.platform;
-  } else {
-    throw new Error("Unsupported platform/runtime");
-  }
+export function newFileTextReader(): FileTextReader {
+  return platform.fileTextReader;
 }
 
-export async function newFileTextLoader(): Promise<FileTextLoader> {
-  return (await getCurrentPlatform()).fileTextLoader;
+export function newFileBinaryReader(): FileBinaryReader {
+  return platform.fileBinaryReader;
 }
 
-export async function newFileBinaryLoader(): Promise<FileBinaryLoader> {
-  return (await getCurrentPlatform()).fileBinaryLoader;
-}
-
-export async function newDirectoryContentsReader(): Promise<
-  DirectoryContentsReader
-> {
-  return (await getCurrentPlatform()).directoryContentsReader;
+export function newDirectoryContentsReader(): DirectoryContentsReader {
+  return platform.directoryContentsReader;
 }
 
 export function newTextFileValueLoader(
-  textLoader: FileTextLoader,
-): Promise<FileValueLoader> {
-  return Promise.resolve<FileValueLoader>(Object.freeze({
+  textLoader: FileTextReader,
+): FileValueLoader {
+  return Object.freeze({
     name: "Text file value loader",
     loadValueFromFile: (
       path: URL,
       options?: FileValueLoaderOptions,
     ) => {
       options?.signal?.throwIfAborted();
-      return textLoader.loadTextFromFile(path, options);
+      return textLoader.readTextFromFile(path, options);
     },
-  }));
+  });
 }
 
 export function newBinaryFileValueLoader(
-  binaryLoader: FileBinaryLoader,
-): Promise<FileValueLoader> {
-  return Promise.resolve<FileValueLoader>(Object.freeze({
+  binaryLoader: FileBinaryReader,
+): FileValueLoader {
+  return Object.freeze({
     name: "Binary file value loader",
     loadValueFromFile: (
       path: URL,
       options?: FileValueLoaderOptions,
     ) => {
       options?.signal?.throwIfAborted();
-      return binaryLoader.loadBinaryFromFile(path, options);
+      return binaryLoader.readBinaryFromFile(path, options);
     },
-  }));
+  });
 }
 
 export type StringParserFunc = (input: string) => unknown;
 
 export function newStringParserFileValueLoader(
-  textLoader: FileTextLoader,
+  textLoader: FileTextReader,
   parser: StringParserFunc,
   name: string,
-): Promise<FileValueLoader> {
-  return Promise.resolve<FileValueLoader>(Object.freeze({
+): FileValueLoader {
+  return Object.freeze({
     name: name,
     loadValueFromFile: async (
       path: URL,
       options?: FileValueLoaderOptions,
     ) => {
       options?.signal?.throwIfAborted();
-      const text = await textLoader.loadTextFromFile(path, options);
+      const text = await textLoader.readTextFromFile(path, options);
       return parser(text);
     },
-  }));
+  });
 }
 
 export function newJsonFileValueLoader(
-  textLoader: FileTextLoader,
-): Promise<FileValueLoader> {
+  textLoader: FileTextReader,
+): FileValueLoader {
   return newStringParserFileValueLoader(
     textLoader,
     JSON.parse,
@@ -102,26 +85,24 @@ export function newJsonFileValueLoader(
   );
 }
 
-export async function newDefaultFileValueLoaders(): Promise<
-  Map<string, FileValueLoader>
-> {
-  const textLoader = await newFileTextLoader();
+export function newDefaultFileValueLoaders(): Map<string, FileValueLoader> {
+  const textLoader = newFileTextReader();
   return new Map<string, FileValueLoader>([
-    [".json", await newJsonFileValueLoader(textLoader)],
-    [".txt", await newTextFileValueLoader(textLoader)],
+    [".json", newJsonFileValueLoader(textLoader)],
+    [".txt", newTextFileValueLoader(textLoader)],
   ]);
 }
 
-export async function newDirectoryObjectLoader(
+export function newDirectoryObjectLoader(
   loaders?: Iterable<Readonly<[string, FileValueLoader]>>,
   directoryReader?: DirectoryContentsReader,
-): Promise<DirectoryObjectLoader> {
+): DirectoryObjectLoader {
   if (loaders === undefined) {
-    loaders = await newDefaultFileValueLoaders();
+    loaders = newDefaultFileValueLoaders();
   }
 
   if (directoryReader === undefined) {
-    directoryReader = await newDirectoryContentsReader();
+    directoryReader = newDirectoryContentsReader();
   }
 
   return Object.freeze({

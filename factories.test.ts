@@ -5,35 +5,31 @@ import {
   newDefaultFileValueLoaders,
   newDirectoryContentsReader,
   newDirectoryObjectLoader,
-  newFileBinaryLoader,
-  newFileTextLoader,
+  newFileBinaryReader,
+  newFileTextReader,
 } from "./factories.ts";
 import type { DirectoryEntry } from "./interfaces.ts";
 
-test("newFileTextLoader: load a file", async () => {
-  const loader = await newFileTextLoader();
+test("newFileTextReader: load a file", async () => {
+  const reader = newFileTextReader();
 
-  assertExists(loader, "The text file loader should be created.");
+  assertExists(reader, "The text file reader should be created.");
 
-  const licenseUrl = new URL("LICENSE", import.meta.url);
-  const licenseContents = await loader.loadTextFromFile(licenseUrl);
-  assertExists(licenseContents, "The text file should be loaded.");
-  assert(
-    licenseContents.startsWith("MIT License"),
-    "The file contents should be as expected",
-  );
+  const fileUrl = new URL("test_data/SimpleDirectory/text.txt", import.meta.url);
+  const fileContents = await reader.readTextFromFile(fileUrl);
+  assertEquals(fileContents, "This is a test\n");
 });
 
-test("newFileBinaryLoader: load a file of zeros", async () => {
-  const loader = await newFileBinaryLoader();
+test("newFileBinaryReader: load a file of zeros", async () => {
+  const reader = newFileBinaryReader();
 
-  assertExists(loader, "The binary file loader should be created.");
+  assertExists(reader, "The binary file reader should be created.");
 
   const licenseUrl = new URL(
-    "test_data/FileBinaryLoader/zeros.bin",
+    "test_data/FileBinaryReader/zeros.bin",
     import.meta.url,
   );
-  const fileContents = await loader.loadBinaryFromFile(licenseUrl);
+  const fileContents = await reader.readBinaryFromFile(licenseUrl);
   assertExists(fileContents, "The binary file should be loaded.");
   assertEquals(
     fileContents.length,
@@ -46,16 +42,16 @@ test("newFileBinaryLoader: load a file of zeros", async () => {
   }
 });
 
-test("newFileBinaryLoader: load a file of incrementing numbers", async () => {
-  const loader = await newFileBinaryLoader();
+test("newFileBinaryReader: load a file of incrementing numbers", async () => {
+  const reader = newFileBinaryReader();
 
-  assertExists(loader, "The binary file loader should be created.");
+  assertExists(reader, "The binary file reader should be created.");
 
   const licenseUrl = new URL(
-    "test_data/FileBinaryLoader/ramp.bin",
+    "test_data/FileBinaryReader/ramp.bin",
     import.meta.url,
   );
-  const fileContents = await loader.loadBinaryFromFile(licenseUrl);
+  const fileContents = await reader.readBinaryFromFile(licenseUrl);
   assertExists(fileContents, "The binary file should be loaded.");
   assertEquals(
     fileContents.length,
@@ -70,7 +66,7 @@ test("newFileBinaryLoader: load a file of incrementing numbers", async () => {
 });
 
 test("newDirectoryContentsReader: read a directory (no options)", async () => {
-  const directoryReader = await newDirectoryContentsReader();
+  const directoryReader = newDirectoryContentsReader();
 
   assertExists(
     directoryReader,
@@ -100,7 +96,7 @@ test("newDirectoryContentsReader: read a directory (no options)", async () => {
 });
 
 test("newDirectoryContentsReader: read a directory (include symlinks)", async () => {
-  const directoryReader = await newDirectoryContentsReader();
+  const directoryReader = newDirectoryContentsReader();
 
   assertExists(
     directoryReader,
@@ -131,7 +127,7 @@ test("newDirectoryContentsReader: read a directory (include symlinks)", async ()
 });
 
 test("newDirectoryContentsReader: read a directory (aborted)", async () => {
-  const directoryReader = await newDirectoryContentsReader();
+  const directoryReader = newDirectoryContentsReader();
 
   assertExists(
     directoryReader,
@@ -143,7 +139,7 @@ test("newDirectoryContentsReader: read a directory (aborted)", async () => {
     import.meta.url,
   );
 
-  assertRejects(async () => {
+  await assertRejects(async () => {
     return await directoryReader.loadDirectoryContents(
       testDirectoryUrl,
       { signal: AbortSignal.abort("foo") },
@@ -152,7 +148,7 @@ test("newDirectoryContentsReader: read a directory (aborted)", async () => {
 });
 
 test("newDefaultFileValueLoaders: returns the expected defaults", async () => {
-  const loaders = await newDefaultFileValueLoaders();
+  const loaders = newDefaultFileValueLoaders();
 
   // Update these when we add more loaders to the defaults.
   assertEquals(loaders.size, 2);
@@ -165,7 +161,7 @@ test("newDefaultFileValueLoaders: returns the expected defaults", async () => {
     );
     assertEquals(textValue, "This is a test\n");
 
-    assertRejects(async () => {
+    await assertRejects(async () => {
       return await txtLoader.loadValueFromFile(
         new URL("test_data/SimpleDirectory/text.txt", import.meta.url),
         { signal: AbortSignal.abort("foo") },
@@ -181,7 +177,7 @@ test("newDefaultFileValueLoaders: returns the expected defaults", async () => {
     );
     assertEquals(jsonValue, { foo: "bar" });
 
-    assertRejects(async () => {
+    await assertRejects(async () => {
       return await jsonLoader.loadValueFromFile(
         new URL("test_data/SimpleDirectory/json.json", import.meta.url),
         { signal: AbortSignal.abort("bar") },
@@ -191,7 +187,7 @@ test("newDefaultFileValueLoaders: returns the expected defaults", async () => {
 });
 
 test("newDirectoryObjectLoader reads SimpleDirectory", async () => {
-  const directoryLoader = await newDirectoryObjectLoader();
+  const directoryLoader = newDirectoryObjectLoader();
 
   const directoryUrl = new URL("test_data/SimpleDirectory", import.meta.url);
   const contents = await directoryLoader.loadObjectFromDirectory(directoryUrl);
@@ -205,22 +201,33 @@ test("newDirectoryObjectLoader reads SimpleDirectory", async () => {
 });
 
 test("newDirectoryObjectLoader reads CompleteDirectory", async () => {
-  const loaders = await newDefaultFileValueLoaders();
+  const loaders = newDefaultFileValueLoaders();
 
   // Also demonstrate how to add additional loaders:
-  const binaryLoader = await newFileBinaryLoader();
-  loaders.set(".bin", await newBinaryFileValueLoader(binaryLoader));
+  const binaryLoader = newFileBinaryReader();
+  loaders.set(".bin", newBinaryFileValueLoader(binaryLoader));
 
-  const directoryLoader = await newDirectoryObjectLoader(
+  const directoryLoader = newDirectoryObjectLoader(
     loaders,
-    await newDirectoryContentsReader(),
+    newDirectoryContentsReader(),
   );
 
   const directoryUrl = new URL("test_data/CompleteDirectory", import.meta.url);
   const contents = await directoryLoader.loadObjectFromDirectory(directoryUrl);
 
+  // Node.js returns binary data as a Buffer, which is a Uint8Array subclass.
+  const binary = contents["binary"];
+  assert(binary instanceof Uint8Array);
+  assertEquals(binary.length, 4);
+  assertEquals(binary[0], 0);
+  assertEquals(binary[1], 255);
+  assertEquals(binary[2], 0);
+  assertEquals(binary[3], 255);
+
+  // Remove it because we can't directly test equality when the actual value may be a Uint8Array subclass.
+  delete contents["binary"];
+
   assertEquals(contents, {
-    binary: new Uint8Array([0, 255, 0, 255]),
     test: "This is a test!\n",
     subdirectory: {
       another: "value",

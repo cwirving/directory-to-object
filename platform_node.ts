@@ -2,8 +2,8 @@ import type {
   DirectoryContentsReaderOptions,
   DirectoryEntry,
   DirectoryEntryType,
-  FileBinaryLoaderOptions,
-  FileTextLoaderOptions,
+  FileBinaryReaderOptions,
+  FileTextReaderOptions,
   Platform,
 } from "./interfaces.ts";
 import * as fsPromises from "node:fs/promises";
@@ -16,8 +16,14 @@ async function direntToType(
   options?: DirectoryContentsReaderOptions,
 ): Promise<DirectoryEntryType> {
   if (dirent.isSymbolicLink() && options?.includeSymlinks) {
-    const info = await fsPromises.stat(direntUrl);
-    return info.isFile() ? "file" : info.isDirectory() ? "directory" : "other";
+    try {
+      const info = await fsPromises.stat(direntUrl);
+      return info.isFile() ? "file" : info.isDirectory() ? "directory" : "other";
+    } catch (e) {
+      // Symbolic links to files/directories that don't exist are treated as "other".
+      if (e instanceof Error && (e as { code?: string })?.code === "ENOENT") return "other";
+      throw e;
+    }
   }
 
   return dirent.isFile()
@@ -29,7 +35,7 @@ async function direntToType(
 
 function nodeLoadTextFromFile(
   path: URL,
-  options?: FileTextLoaderOptions,
+  options?: FileTextReaderOptions,
 ): Promise<string> {
   return fsPromises.readFile(path, {
     encoding: "utf-8",
@@ -39,7 +45,7 @@ function nodeLoadTextFromFile(
 
 function nodeLoadBinaryFromFile(
   path: URL,
-  options?: FileBinaryLoaderOptions,
+  options?: FileBinaryReaderOptions,
 ): Promise<Uint8Array> {
   return fsPromises.readFile(path, {
     encoding: null,
@@ -54,8 +60,11 @@ async function nodeLoadDirectoryContents(
   const entries: DirectoryEntry[] = [];
   const nodeEntries = await fsPromises.readdir(path, { withFileTypes: true });
 
+  const pathWithSlash = new URL(path.href + "/");
+
   for (const dirent of nodeEntries) {
-    const direntUrl = new URL(dirent.name, path);
+    options?.signal?.throwIfAborted();
+    const direntUrl = new URL(dirent.name, pathWithSlash);
 
     entries.push({
       name: dirent.name,
@@ -67,17 +76,19 @@ async function nodeLoadDirectoryContents(
   return entries;
 }
 
-export const platform: Platform = Object.freeze({
-  fileTextLoader: {
-    name: "fs.readFile (utf-8)",
-    loadTextFromFile: nodeLoadTextFromFile,
-  },
-  fileBinaryLoader: {
-    name: "fs.readFile (binary)",
-    loadBinaryFromFile: nodeLoadBinaryFromFile,
-  },
-  directoryContentsReader: {
-    name: "fs.readdir",
-    loadDirectoryContents: nodeLoadDirectoryContents,
-  },
-});
+export function makeNodePlatform(): Platform {
+  return Object.freeze({
+    fileTextReader: {
+      name: 'fs.readFile (utf-8)',
+      readTextFromFile: nodeLoadTextFromFile,
+    },
+    fileBinaryReader: {
+      name: 'fs.readFile (binary)',
+      readBinaryFromFile: nodeLoadBinaryFromFile,
+    },
+    directoryContentsReader: {
+      name: 'fs.readdir',
+      loadDirectoryContents: nodeLoadDirectoryContents,
+    },
+  });
+}

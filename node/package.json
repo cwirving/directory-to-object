@@ -4,14 +4,12 @@
   "type": "module",
   "dependencies": {
     "@cross/runtime": "npm:@jsr/cross__runtime@^1.1.0",
-    "@std/assert": "npm:@jsr/std__assert@^1.0.4",
-    "@std/jsonc": "npm:@jsr/std__jsonc@^1.0.1",
-    "@std/yaml": "npm:@jsr/std__yaml@^1.0.5"
+    "@es-toolkit/es-toolkit": "npm:@jsr/es-toolkit__es-toolkit@^1.20.0-dev.629+fd119dd2",
+    "@std/assert": "npm:@jsr/std__assert@^1.0.4"
   },
   "devDependencies": {
     "@cross/test": "npm:@jsr/cross__test@^0.0.9",
-    "@types/node": "latest",
-    "tsx": "^4.19.0"
+    "@types/node": "latest"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"

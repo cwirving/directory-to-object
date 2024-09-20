@@ -1,30 +1,30 @@
 /**
- * Our own equivalent to the Node.JS `Abortable` type. Unfortunately, the Deno and Node.JS
+ * Our own equivalent to the Node.js `Abortable` type. Unfortunately, the Deno and Node.js
  * `AbortSignal` types aren't completely identical, so using `Abortable` causes type checking issues.
  */
 export interface WithOptionalSignal {
   signal?: AbortSignal;
 }
 
-export interface FileTextLoaderOptions extends WithOptionalSignal {
+export interface FileTextReaderOptions extends WithOptionalSignal {
 }
 
-export interface FileTextLoader {
+export interface FileTextReader {
   name: string;
-  loadTextFromFile(
+  readTextFromFile(
     path: URL,
-    options?: FileTextLoaderOptions,
+    options?: FileTextReaderOptions,
   ): Promise<string>;
 }
 
-export interface FileBinaryLoaderOptions extends WithOptionalSignal {
+export interface FileBinaryReaderOptions extends WithOptionalSignal {
 }
 
-export interface FileBinaryLoader {
+export interface FileBinaryReader {
   name: string;
-  loadBinaryFromFile(
+  readBinaryFromFile(
     path: URL,
-    options?: FileTextLoaderOptions,
+    options?: FileTextReaderOptions,
   ): Promise<Uint8Array>;
 }
 
@@ -48,7 +48,13 @@ export interface DirectoryContentsReader {
   ): Promise<DirectoryEntry[]>;
 }
 
-export interface FileValueLoaderOptions extends FileTextLoaderOptions {
+export interface Platform {
+  fileTextReader: FileTextReader;
+  fileBinaryReader: FileBinaryReader;
+  directoryContentsReader: DirectoryContentsReader;
+}
+
+export interface FileValueLoaderOptions extends FileTextReaderOptions {
 }
 
 export interface FileValueLoader {
@@ -68,10 +74,4 @@ export interface DirectoryObjectLoader {
     path: URL,
     options?: DirectoryObjectLoaderOptions,
   ): Promise<Record<string, unknown>>;
-}
-
-export interface Platform {
-  fileTextLoader: FileTextLoader;
-  fileBinaryLoader: FileBinaryLoader;
-  directoryContentsReader: DirectoryContentsReader;
 }

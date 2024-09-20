@@ -2,8 +2,8 @@ import type {
   DirectoryContentsReaderOptions,
   DirectoryEntry,
   DirectoryEntryType,
-  FileBinaryLoaderOptions,
-  FileTextLoaderOptions,
+  FileBinaryReaderOptions,
+  FileTextReaderOptions,
   Platform,
 } from "./interfaces.ts";
 
@@ -35,14 +35,14 @@ async function dirEntryToType(
 
 function denoLoadTextFromFile(
   path: URL,
-  options?: FileTextLoaderOptions,
+  options?: FileTextReaderOptions,
 ): Promise<string> {
   return Deno.readTextFile(path, options);
 }
 
 function denoLoadBinaryFromFile(
   path: URL,
-  options?: FileBinaryLoaderOptions,
+  options?: FileBinaryReaderOptions,
 ): Promise<Uint8Array> {
   return Deno.readFile(path, options);
 }
@@ -68,17 +68,19 @@ async function denoLoadDirectoryContents(
   return entries;
 }
 
-export const platform: Platform = Object.freeze({
-  fileTextLoader: {
-    name: "Deno.readTextFile",
-    loadTextFromFile: denoLoadTextFromFile,
-  },
-  fileBinaryLoader: {
-    name: "Deno.readFile",
-    loadBinaryFromFile: denoLoadBinaryFromFile,
-  },
-  directoryContentsReader: {
-    name: "Deno.readDir",
-    loadDirectoryContents: denoLoadDirectoryContents,
-  },
-});
+export function makeDenoPlatform(): Platform {
+  return Object.freeze({
+    fileTextReader: {
+      name: "Deno.readTextFile",
+      readTextFromFile: denoLoadTextFromFile,
+    },
+    fileBinaryReader: {
+      name: "Deno.readFile",
+      readBinaryFromFile: denoLoadBinaryFromFile,
+    },
+    directoryContentsReader: {
+      name: "Deno.readDir",
+      loadDirectoryContents: denoLoadDirectoryContents,
+    },
+  });
+}

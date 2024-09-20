@@ -4,7 +4,7 @@ import type {
   FileValueLoader,
   FileValueLoaderOptions,
 } from "./interfaces.ts";
-import { merge } from "jsr:@es-toolkit/es-toolkit";
+import { merge } from "@es-toolkit/es-toolkit";
 
 const validExtensionRegex = /^(\.\w+)+$/;
 

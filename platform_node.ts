@@ -18,10 +18,16 @@ async function direntToType(
   if (dirent.isSymbolicLink() && options?.includeSymlinks) {
     try {
       const info = await fsPromises.stat(direntUrl);
-      return info.isFile() ? "file" : info.isDirectory() ? "directory" : "other";
+      return info.isFile()
+        ? "file"
+        : info.isDirectory()
+        ? "directory"
+        : "other";
     } catch (e) {
       // Symbolic links to files/directories that don't exist are treated as "other".
-      if (e instanceof Error && (e as { code?: string })?.code === "ENOENT") return "other";
+      if (e instanceof Error && (e as { code?: string })?.code === "ENOENT") {
+        return "other";
+      }
       throw e;
     }
   }
@@ -79,15 +85,15 @@ async function nodeLoadDirectoryContents(
 export function makeNodePlatform(): Platform {
   return Object.freeze({
     fileTextReader: {
-      name: 'fs.readFile (utf-8)',
+      name: "fs.readFile (utf-8)",
       readTextFromFile: nodeLoadTextFromFile,
     },
     fileBinaryReader: {
-      name: 'fs.readFile (binary)',
+      name: "fs.readFile (binary)",
       readBinaryFromFile: nodeLoadBinaryFromFile,
     },
     directoryContentsReader: {
-      name: 'fs.readdir',
+      name: "fs.readdir",
       loadDirectoryContents: nodeLoadDirectoryContents,
     },
   });

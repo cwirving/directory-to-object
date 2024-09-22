@@ -11,7 +11,7 @@ import {
   genericLoadObjectFromDirectory,
   validateLoaders,
 } from "./directory_loader.ts";
-import { platform } from './platform.ts';
+import { platform } from "./platform.ts";
 
 export function newFileTextReader(): FileTextReader {
   return platform.fileTextReader;
@@ -94,13 +94,9 @@ export function newDefaultFileValueLoaders(): Map<string, FileValueLoader> {
 }
 
 export function newDirectoryObjectLoader(
-  loaders?: Iterable<Readonly<[string, FileValueLoader]>>,
+  loaders: Iterable<Readonly<[string, FileValueLoader]>>,
   directoryReader?: DirectoryContentsReader,
 ): DirectoryObjectLoader {
-  if (loaders === undefined) {
-    loaders = newDefaultFileValueLoaders();
-  }
-
   if (directoryReader === undefined) {
     directoryReader = newDirectoryContentsReader();
   }
@@ -108,14 +104,15 @@ export function newDirectoryObjectLoader(
   return Object.freeze({
     name: "Generic directory object loader",
     _loaders: loaders, // Not used. Just present to make code easier to debug.
-    loadObjectFromDirectory: (
+    loadObjectFromDirectory: async (
       path: URL,
       options?: DirectoryObjectLoaderOptions,
     ) => {
       options?.signal?.throwIfAborted();
+      // We clone to an array to maintain the loader order.
       const clonedLoaders = Array.from(loaders);
       validateLoaders(clonedLoaders);
-      return genericLoadObjectFromDirectory(
+      return await genericLoadObjectFromDirectory(
         path,
         clonedLoaders,
         directoryReader,

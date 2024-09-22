@@ -7,10 +7,10 @@ import type {
   FileValueLoaderOptions,
 } from "./interfaces.ts";
 import {
+  _setOrMergeValue,
   genericLoadObjectFromDirectory,
   isRecord,
   loadValueFromFile,
-  setOrMergeValue,
   validateLoaders,
 } from "./directory_loader.ts";
 import { assertEquals, assertThrows, fail } from "@std/assert";
@@ -127,40 +127,40 @@ test("isRecord", () => {
   assertEquals(isRecord(new Something()), false);
 });
 
-test("setOrMergeValue plain overwrite cases", () => {
+test("_setOrMergeValue plain overwrite cases", () => {
   const target = {};
 
   // New values
-  setOrMergeValue(target, "a", 1);
+  _setOrMergeValue(target, "a", 1);
   assertEquals(target, { a: 1 });
-  setOrMergeValue(target, "b", "abc");
+  _setOrMergeValue(target, "b", "abc");
   assertEquals(target, { a: 1, b: "abc" });
-  setOrMergeValue(target, "c", { x: "yz" });
+  _setOrMergeValue(target, "c", { x: "yz" });
   assertEquals(target, { a: 1, b: "abc", c: { x: "yz" } });
 
   // Overwrites
-  setOrMergeValue(target, "a", 2);
+  _setOrMergeValue(target, "a", 2);
   assertEquals(target, { a: 2, b: "abc", c: { x: "yz" } });
-  setOrMergeValue(target, "a", "foo");
+  _setOrMergeValue(target, "a", "foo");
   assertEquals(target, { a: "foo", b: "abc", c: { x: "yz" } });
-  setOrMergeValue(target, "a", { foo: "bar" });
+  _setOrMergeValue(target, "a", { foo: "bar" });
   assertEquals(target, { a: { foo: "bar" }, b: "abc", c: { x: "yz" } });
 });
 
-test("setOrMergeValue merge cases from es-toolkit documentation", () => {
+test("_setOrMergeValue merge cases from es-toolkit documentation", () => {
   let target: Record<string, unknown> = { a: 1, b: { x: 1, y: 2 } };
   let source: Record<string, unknown> = { b: { y: 3, z: 4 }, c: 5 };
-  setOrMergeValue({ data: target }, "data", source);
+  _setOrMergeValue({ data: target }, "data", source);
   assertEquals(target, { a: 1, b: { x: 1, y: 3, z: 4 }, c: 5 });
 
   target = { a: [1, 2], b: { x: 1 } };
   source = { a: [3], b: { y: 2 } };
-  setOrMergeValue({ data: target }, "data", source);
+  _setOrMergeValue({ data: target }, "data", source);
   assertEquals(target, { a: [3, 2], b: { x: 1, y: 2 } });
 
   target = { a: null };
   source = { a: [1, 2, 3] };
-  setOrMergeValue({ data: target }, "data", source);
+  _setOrMergeValue({ data: target }, "data", source);
   assertEquals(target, { a: [1, 2, 3] });
 });
 

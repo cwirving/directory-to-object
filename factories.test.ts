@@ -15,7 +15,10 @@ test("newFileTextReader: load a file", async () => {
 
   assertExists(reader, "The text file reader should be created.");
 
-  const fileUrl = new URL("test_data/SimpleDirectory/text.txt", import.meta.url);
+  const fileUrl = new URL(
+    "test_data/SimpleDirectory/text.txt",
+    import.meta.url,
+  );
   const fileContents = await reader.readTextFromFile(fileUrl);
   assertEquals(fileContents, "This is a test\n");
 });
@@ -187,7 +190,9 @@ test("newDefaultFileValueLoaders: returns the expected defaults", async () => {
 });
 
 test("newDirectoryObjectLoader reads SimpleDirectory", async () => {
-  const directoryLoader = newDirectoryObjectLoader();
+  const directoryLoader = newDirectoryObjectLoader(
+    newDefaultFileValueLoaders(),
+  );
 
   const directoryUrl = new URL("test_data/SimpleDirectory", import.meta.url);
   const contents = await directoryLoader.loadObjectFromDirectory(directoryUrl);

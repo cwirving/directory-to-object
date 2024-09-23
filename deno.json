@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "exports": "./mod.ts",
   "tasks": {
+    "check": "deno check *.ts",
+    "fmt": "deno fmt *.ts *.md",
+    "lint": "deno lint *.ts",
     "test": "deno test --coverage --allow-read *.test.ts"
   },
   "license": "MIT",

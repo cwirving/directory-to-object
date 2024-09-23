@@ -1,5 +1,7 @@
 # Directory-To-Object: A configuration directory reader
 
+**Note:** This documentation is still work in progress...
+
 ## Introduction and rationale
 
 This library is intended for complicated configuration cases where having just
@@ -118,6 +120,7 @@ For example, to add YAML support,
 ```typescript
 import * as YAML from "@std/yaml";
 import {
+  fileValueLoaders,
   newFileTextReader,
   newStringParserFileValueLoader,
 } from "@scroogieboy/directory-to-object";

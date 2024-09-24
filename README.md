@@ -1,7 +1,5 @@
 # Directory-To-Object: A configuration directory reader
 
-**Note:** This documentation is still work in progress...
-
 ## Introduction and rationale
 
 This library is intended for complicated configuration cases where having just
@@ -98,7 +96,6 @@ them to the `fileValueLoaders` map. For example:
 ```typescript
 import {
   fileValueLoaders,
-  loadObjectFromDirectory,
   newBinaryFileValueLoader,
   newFileBinaryReader,
 } from "@scroogieboy/directory-to-object";
@@ -133,4 +130,50 @@ const yamlLoader = newStringParserFileValueLoader(
 
 // Add it for the ".yaml" extension
 fileValueLoaders.set(".yaml", yamlLoader);
+```
+
+### Taking control: using `newDirectoryObjectLoader`
+
+The `newDirectoryObjectLoader` function allows the caller to construct a
+directory object loader with exactly the readers and loaders they need.
+
+For example, to create a directory loader than only processes binary (".bin")
+and YAML (".yaml") files:
+
+```typescript
+import * as YAML from "@std/yaml";
+import { fromFileUrl } from "@std/path";
+import {
+  fileValueLoaders,
+  newBinaryFileValueLoader,
+  newFileBinaryReader,
+  newFileTextReader,
+  newStringParserFileValueLoader,
+} from "@scroogieboy/directory-to-object";
+
+const yamlLoader = newStringParserFileValueLoader(
+  newFileTextReader(),
+  YAML.parse,
+);
+
+const binaryLoader = newBinaryFileValueLoader(newFileBinaryReader());
+
+const loaders = [
+  [".yaml", yamlLoader],
+  [".bin", binaryLoader],
+];
+
+// Create an object loader with exactly the loaders we created above.
+const directoryLoader = newDirectoryObjectLoader(
+  loaders,
+  newDirectoryContentsReader(),
+);
+
+const directoryUrl = new URL(
+  fromFileUrl(await Deno.realPath("./my-config-directory")),
+);
+const configuration = directoryLoader.loadObjectFromDirectory(directoryUrl);
+
+// Pretty-print the configuration
+console.log(configuration, null, 2);
 ```

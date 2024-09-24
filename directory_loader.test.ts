@@ -8,8 +8,8 @@ import type {
 } from "./interfaces.ts";
 import {
   _setOrMergeValue,
-  genericLoadObjectFromDirectory,
   isRecord,
+  loadObjectFromDirectoryEx,
   loadValueFromFile,
   validateLoaders,
 } from "./directory_loader.ts";
@@ -230,7 +230,7 @@ test("loadValueFromFile returns undefined on no match", async () => {
   );
 });
 
-test("genericLoadObjectFromDirectory", async () => {
+test("loadObjectFromDirectoryEx", async () => {
   const loader = new MockFileValueLoader("loader", {
     "file:///dir/a.txt": "a",
     "file:///dir/b.txt": "b",
@@ -263,7 +263,7 @@ test("genericLoadObjectFromDirectory", async () => {
     }],
   });
 
-  const result = await genericLoadObjectFromDirectory(
+  const result = await loadObjectFromDirectoryEx(
     new URL("file:///dir"),
     loaders,
     reader,

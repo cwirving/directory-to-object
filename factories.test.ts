@@ -215,7 +215,10 @@ test("newDirectoryObjectLoader reads CompleteDirectory", async () => {
   const directoryLoader = newDirectoryObjectLoader(
     loaders,
     newDirectoryContentsReader(),
+    "foo",
   );
+
+  assertEquals(directoryLoader.name, "foo");
 
   const directoryUrl = new URL("test_data/CompleteDirectory", import.meta.url);
   const contents = await directoryLoader.loadObjectFromDirectory(directoryUrl);

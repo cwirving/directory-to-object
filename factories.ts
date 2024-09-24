@@ -8,25 +8,50 @@ import type {
   FileValueLoaderOptions,
 } from "./interfaces.ts";
 import {
-  genericLoadObjectFromDirectory,
+  loadObjectFromDirectoryEx,
   validateLoaders,
 } from "./directory_loader.ts";
 import { platform } from "./platform.ts";
 
+/**
+ * Create a new text file text reader appropriate for reading local files on the current platform.
+ *
+ * Text file loaders don't interpret the contents of the file, they just return them as-is (as a string).
+ *
+ * @returns An object implementing the {@link FileTextReader} interface.
+ */
 export function newFileTextReader(): FileTextReader {
   return platform.fileTextReader;
 }
 
+/**
+ * Create a new binary file text reader appropriate for reading local files on the current platform.
+ *
+ * Binary file loaders don't interpret the contents of the file, they just return them as-is (as a `Uint8Array`).
+ *
+ * @returns An object implementing the {@link FileBinaryReader} interface.
+ */
 export function newFileBinaryReader(): FileBinaryReader {
   return platform.fileBinaryReader;
 }
 
+/**
+ * Create a new directory contents reader appropriate for reading directory contents on the current platform.
+ *
+ * @returns An object implementing the {@link DirectoryContentsReader} interface.
+ */
 export function newDirectoryContentsReader(): DirectoryContentsReader {
   return platform.directoryContentsReader;
 }
 
+/**
+ * Create a new loader for plain text files, using the provided file text reader.
+ *
+ * @param textReader The file text reader to perform the physical file reading.
+ * @returns An object implementing the {@link FileValueLoader} interface that performs plain text file loading into string values.
+ */
 export function newTextFileValueLoader(
-  textLoader: FileTextReader,
+  textReader: FileTextReader,
 ): FileValueLoader {
   return Object.freeze({
     name: "Text file value loader",
@@ -35,13 +60,19 @@ export function newTextFileValueLoader(
       options?: FileValueLoaderOptions,
     ) => {
       options?.signal?.throwIfAborted();
-      return textLoader.readTextFromFile(path, options);
+      return textReader.readTextFromFile(path, options);
     },
   });
 }
 
+/**
+ * Create a new loader for (opaque) binary files, using the provided binary file loader.
+ *
+ * @param binaryReader The binary file reader used to perform the physical file reading.
+ * @returns An object implementing the {@link FileValueLoader} interface.
+ */
 export function newBinaryFileValueLoader(
-  binaryLoader: FileBinaryReader,
+  binaryReader: FileBinaryReader,
 ): FileValueLoader {
   return Object.freeze({
     name: "Binary file value loader",
@@ -50,15 +81,26 @@ export function newBinaryFileValueLoader(
       options?: FileValueLoaderOptions,
     ) => {
       options?.signal?.throwIfAborted();
-      return binaryLoader.readBinaryFromFile(path, options);
+      return binaryReader.readBinaryFromFile(path, options);
     },
   });
 }
 
+/**
+ * The signature expected of string parser functions passed to {@linkcode newStringParserFileValueLoader} function.
+ */
 export type StringParserFunc = (input: string) => unknown;
 
+/**
+ * Create a new text file loader using an externally-provided parser function.
+ *
+ * @param textReader The underlying text file reader used to perform the physical file reading.
+ * @param parser The string parser function applied to the string loaded by the text file reader.
+ * @param name The name to give the resulting file value loader.
+ * @returns An object implementing the {@link FileValueLoader} interface.
+ */
 export function newStringParserFileValueLoader(
-  textLoader: FileTextReader,
+  textReader: FileTextReader,
   parser: StringParserFunc,
   name: string,
 ): FileValueLoader {
@@ -69,22 +111,41 @@ export function newStringParserFileValueLoader(
       options?: FileValueLoaderOptions,
     ) => {
       options?.signal?.throwIfAborted();
-      const text = await textLoader.readTextFromFile(path, options);
+      const text = await textReader.readTextFromFile(path, options);
       return parser(text);
     },
   });
 }
 
+/**
+ * Create a new JSON file value loader with the provided text file reader.
+ *
+ * @param textReader The underlying text file reader used to perform physical file reading.
+ * @returns An object implementing the {@link FileValueLoader} interface which reads and parses JSON files.
+ */
 export function newJsonFileValueLoader(
-  textLoader: FileTextReader,
+  textReader: FileTextReader,
 ): FileValueLoader {
   return newStringParserFileValueLoader(
-    textLoader,
+    textReader,
     JSON.parse,
     "JSON file value loader",
   );
 }
 
+/**
+ * Create the default file value loaders using built-in types:
+ * - A text file value loader for the ".txt" file extension.
+ * - A JSON file value loader for the ".json" file extension.
+ *
+ * This map can be passed to the {@link newDirectoryObjectLoader} function to specify which
+ * file extensions will be processed and the corresponding file loader.
+ *
+ * The function returns a new map each time it is called, so the caller can
+ * add additional entries without interfering with other loader maps.
+ *
+ * @returns A map of file extensions (as strings, including the dot -- e.g., ".txt") to the corresponding {@link FileValueLoader} to use for that extension.
+ */
 export function newDefaultFileValueLoaders(): Map<string, FileValueLoader> {
   const textLoader = newFileTextReader();
   return new Map<string, FileValueLoader>([
@@ -93,16 +154,25 @@ export function newDefaultFileValueLoaders(): Map<string, FileValueLoader> {
   ]);
 }
 
+/**
+ * Create a new directory object loader, given loader mappings and a directory reader.
+ *
+ * @param loaders The mappings from file extension to file loader. Note that this can be an ordered array of tuples -- they are checked in order.
+ * @param directoryReader The optional directory reader used to determine directory contents. Defaults to a local directory reader.
+ * @param name The optional name of the loader.
+ * @returns An object implementing interface {@link DirectoryContentsReader}.
+ */
 export function newDirectoryObjectLoader(
   loaders: Iterable<Readonly<[string, FileValueLoader]>>,
   directoryReader?: DirectoryContentsReader,
+  name?: string,
 ): DirectoryObjectLoader {
   if (directoryReader === undefined) {
     directoryReader = newDirectoryContentsReader();
   }
 
   return Object.freeze({
-    name: "Generic directory object loader",
+    name: name ?? "Generic directory object loader",
     _loaders: loaders, // Not used. Just present to make code easier to debug.
     loadObjectFromDirectory: async (
       path: URL,
@@ -112,7 +182,7 @@ export function newDirectoryObjectLoader(
       // We clone to an array to maintain the loader order.
       const clonedLoaders = Array.from(loaders);
       validateLoaders(clonedLoaders);
-      return await genericLoadObjectFromDirectory(
+      return await loadObjectFromDirectoryEx(
         path,
         clonedLoaders,
         directoryReader,

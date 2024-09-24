@@ -4,8 +4,8 @@ import type {
   DirectoryEntryType,
   FileBinaryReaderOptions,
   FileTextReaderOptions,
-  Platform,
 } from "./interfaces.ts";
+import type { Platform } from "./platform.ts";
 
 async function dirEntryToType(
   dirEntry: Deno.DirEntry,

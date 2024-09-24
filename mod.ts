@@ -4,8 +4,8 @@ import {
   newDirectoryObjectLoader,
 } from "./factories.ts";
 
+export type * from "./interfaces.ts";
 export * from "./factories.ts";
-export { genericLoadObjectFromDirectory } from "./directory_loader.ts";
 
 /**
  * The file value loaders that will be used by the top-level `loadObjectFromDirectory`
@@ -16,14 +16,14 @@ export { genericLoadObjectFromDirectory } from "./directory_loader.ts";
 const fileValueLoaders = newDefaultFileValueLoaders();
 
 /**
- * Asynchronously load the contents of a directory into a new plain-old JavaScript object.
+ * Asynchronously load the contents of a directory into a new plain JavaScript object.
  * This will retrieve a listing of the directory, iterate over each file/directory listed
  * and load those that have file value loaders registered.
  *
  * **Note:** The file value loaders defined in the `fileValueLoaders` variable are applied in an
  * unspecified order, so this convenience function should only be used in the (most common) case
  * where there are no conflicting loaders. If you need to control the loader priority
- * order, construct your own file value loders in an array of tuples and construct a directory
+ * order, construct your own file value loaders in an array of tuples and construct a directory
  * object loader directly using the `newDirectoryObjectLoader` factory function/
  *
  * @param path The URL of the directory to load. For local directories, this should be a `file:` URL.

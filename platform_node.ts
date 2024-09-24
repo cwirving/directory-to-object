@@ -4,11 +4,11 @@ import type {
   DirectoryEntryType,
   FileBinaryReaderOptions,
   FileTextReaderOptions,
-  Platform,
 } from "./interfaces.ts";
 import * as fsPromises from "node:fs/promises";
 import type { Dirent } from "node:fs";
 import type { Abortable } from "node:events";
+import type { Platform } from "./platform.ts";
 
 async function direntToType(
   dirent: Dirent,

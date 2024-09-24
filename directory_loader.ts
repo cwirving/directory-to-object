@@ -27,7 +27,7 @@ export function validateLoaders(
 }
 
 /**
- * Check that a value is a plain-old JavaScript object (i.e., not a class instance).
+ * Check that a value is a plain JavaScript object (i.e., not a class instance).
  *
  * @param candidate The value to introspect.
  */
@@ -109,15 +109,22 @@ export async function loadValueFromFile(
 
 /**
  * Generic implementation of a directory to object loader. Loads the contents of a directory
- * as a plain-old JavaScript object, using `loadValueFromFile` to load the values of
- * files in the directory into properties named like the extension-less file name.
+ * as a plain JavaScript object, using the {@linkcode loadValueFromFile} function to load
+ * the values of files in the directory into properties named like the extension-less file name.
+ *
+ * The difference between this and the module-level `loadObjectFromDirectory` function is
+ * that is the inner, fully-parameterized, version of the function. The module-level function
+ * is a convenience, this is the inner plumbing.
+ *
+ * The naming is a wink to the Microsoft convention of old where Windows APIs had basic versions
+ * and "Ex" versions with more parameters.
  *
  * @param path The URL of the directory to load. I.e., `file:` URL for local directories.
  * @param loaders The file value loaders to consider when loading directory contents.
  * @param directoryReader The directory reader implementation to use to read the directory listing.
  * @param options Options to pass to the directory reader and file value loaders as they are called.
  */
-export async function genericLoadObjectFromDirectory(
+export async function loadObjectFromDirectoryEx(
   path: URL,
   loaders: Iterable<Readonly<[string, FileValueLoader]>>,
   directoryReader: DirectoryContentsReader,
@@ -145,7 +152,7 @@ export async function genericLoadObjectFromDirectory(
         _setOrMergeValue(
           result,
           entry.name,
-          await genericLoadObjectFromDirectory(
+          await loadObjectFromDirectoryEx(
             entry.url,
             loaders,
             directoryReader,

@@ -147,10 +147,10 @@ export function newJsonFileValueLoader(
  * @returns A map of file extensions (as strings, including the dot -- e.g., ".txt") to the corresponding {@link FileValueLoader} to use for that extension.
  */
 export function newDefaultFileValueLoaders(): Map<string, FileValueLoader> {
-  const textLoader = newFileTextReader();
+  const textReader = newFileTextReader();
   return new Map<string, FileValueLoader>([
-    [".json", newJsonFileValueLoader(textLoader)],
-    [".txt", newTextFileValueLoader(textLoader)],
+    [".json", newJsonFileValueLoader(textReader)],
+    [".txt", newTextFileValueLoader(textReader)],
   ]);
 }
 
@@ -171,6 +171,10 @@ export function newDirectoryObjectLoader(
     directoryReader = newDirectoryContentsReader();
   }
 
+  // We clone the loader iterable to an array to maintain their order.
+  const clonedLoaders = Array.from(loaders);
+  validateLoaders(clonedLoaders);
+
   return Object.freeze({
     name: name ?? "Generic directory object loader",
     _loaders: loaders, // Not used. Just present to make code easier to debug.
@@ -179,9 +183,7 @@ export function newDirectoryObjectLoader(
       options?: DirectoryObjectLoaderOptions,
     ) => {
       options?.signal?.throwIfAborted();
-      // We clone to an array to maintain the loader order.
-      const clonedLoaders = Array.from(loaders);
-      validateLoaders(clonedLoaders);
+
       return await loadObjectFromDirectoryEx(
         path,
         clonedLoaders,

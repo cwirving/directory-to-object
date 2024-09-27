@@ -177,3 +177,5 @@ dist
 # Copied test files
 node/*.ts
 
+# The example directory lockfile
+examples/deno.lock

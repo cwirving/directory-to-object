@@ -13,7 +13,7 @@ export * from "./factories.ts";
  *  but the set can be modified at runtime and changes will apply the next time
  * `loadObjectFromDirectory` is called.
  */
-const fileValueLoaders = newDefaultFileValueLoaders();
+export const fileValueLoaders = newDefaultFileValueLoaders();
 
 /**
  * Asynchronously load the contents of a directory into a new plain JavaScript object.

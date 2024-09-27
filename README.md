@@ -48,7 +48,7 @@ Loading a configuration directory is as simple as (Node.js example):
 ```typescript
 import { loadObjectFromDirectory } from "@scroogieboy/directory-to-object";
 
-const directorUrl = path.url.pathToFileURL("./my-config-directory");
+const directorUrl = url.pathToFileURL("./my-config-directory");
 const configuration = await loadObjectFromDirectory(directorUrl);
 
 // Do something with the configuration... E.g., print it.
@@ -126,6 +126,7 @@ import {
 const yamlLoader = newStringParserFileValueLoader(
   newFileTextReader(),
   YAML.parse,
+  "YAML file value loader",
 );
 
 // Add it for the ".yaml" extension
@@ -142,10 +143,13 @@ and YAML (".yaml") files:
 
 ```typescript
 import * as YAML from "@std/yaml";
-import { fromFileUrl } from "@std/path";
+import { toFileUrl } from "@std/path";
 import {
+  type FileValueLoader,
   fileValueLoaders,
   newBinaryFileValueLoader,
+  newDirectoryContentsReader,
+  newDirectoryObjectLoader,
   newFileBinaryReader,
   newFileTextReader,
   newStringParserFileValueLoader,
@@ -154,11 +158,12 @@ import {
 const yamlLoader = newStringParserFileValueLoader(
   newFileTextReader(),
   YAML.parse,
+  "YAML file value loader",
 );
 
 const binaryLoader = newBinaryFileValueLoader(newFileBinaryReader());
 
-const loaders = [
+const loaders: [string, FileValueLoader][] = [
   [".yaml", yamlLoader],
   [".bin", binaryLoader],
 ];
@@ -170,7 +175,7 @@ const directoryLoader = newDirectoryObjectLoader(
 );
 
 const directoryUrl = new URL(
-  fromFileUrl(await Deno.realPath("./my-config-directory")),
+  toFileUrl(await Deno.realPath("./my-config-directory")),
 );
 const configuration = directoryLoader.loadObjectFromDirectory(directoryUrl);
 

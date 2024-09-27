@@ -174,8 +174,10 @@ dist
 # Finder (MacOS) folder config
 .DS_Store
 
-# Copied test files
+# Copied test files & lockfiles
 node/*.ts
+node/bun.lockb
+node/package-lock.json
 
 # The example directory lockfile
 examples/deno.lock

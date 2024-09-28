@@ -2,7 +2,6 @@ import * as YAML from "@std/yaml";
 import { toFileUrl } from "@std/path";
 import {
   type FileValueLoader,
-  fileValueLoaders,
   newBinaryFileValueLoader,
   newDirectoryContentsReader,
   newDirectoryObjectLoader,

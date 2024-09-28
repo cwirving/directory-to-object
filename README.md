@@ -41,6 +41,12 @@ Loading the directory using this library would result in the same configuration
 structure, but the file system representation is less monolithic and can be
 easier for collaboration between less technically-savvy people.
 
+## CLI
+
+See the
+[`@scroogieboy/directory-to-object-cli`](https://jsr.io/@scroogieboy/directory-to-object-cli)
+package for a simple CLI tool that exercises the capabilities of this library.
+
 ## Example
 
 Loading a configuration directory is as simple as (Node.js example):

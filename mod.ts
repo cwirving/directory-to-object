@@ -1,4 +1,7 @@
-import type { DirectoryObjectLoaderOptions, FileValueLoader } from './interfaces.ts';
+import type {
+  DirectoryObjectLoaderOptions,
+  FileValueLoader,
+} from "./interfaces.ts";
 import {
   newDefaultFileValueLoaders,
   newDirectoryObjectLoader,
@@ -13,7 +16,8 @@ export * from "./factories.ts";
  *  but the set can be modified at runtime and changes will apply the next time
  * `loadObjectFromDirectory` is called.
  */
-export const fileValueLoaders: Map<string, FileValueLoader> = newDefaultFileValueLoaders();
+export const fileValueLoaders: Map<string, FileValueLoader> =
+  newDefaultFileValueLoaders();
 
 /**
  * Asynchronously load the contents of a directory into a new plain JavaScript object.

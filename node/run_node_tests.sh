@@ -4,6 +4,8 @@ if [[ -d ./node_modules ]]; then
   rm -rf ./node_modules
 fi
 
+set -e
+
 npm install
 
 cp ../*.ts .

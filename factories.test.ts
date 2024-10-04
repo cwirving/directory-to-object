@@ -8,7 +8,11 @@ import {
   newFileBinaryReader,
   newFileTextReader,
 } from "./factories.ts";
-import type { DirectoryEntry } from "./interfaces.ts";
+import type {
+  DirectoryEntry,
+  DirectoryObjectLoaderOptions,
+} from "./interfaces.ts";
+import { merge } from "@es-toolkit/es-toolkit";
 
 test("newFileTextReader: load a file", async () => {
   const reader = newFileTextReader();
@@ -205,24 +209,7 @@ test("newDirectoryObjectLoader reads SimpleDirectory", async () => {
   });
 });
 
-test("newDirectoryObjectLoader reads CompleteDirectory", async () => {
-  const loaders = newDefaultFileValueLoaders();
-
-  // Also demonstrate how to add additional loaders:
-  const binaryLoader = newFileBinaryReader();
-  loaders.set(".bin", newBinaryFileValueLoader(binaryLoader));
-
-  const directoryLoader = newDirectoryObjectLoader(
-    loaders,
-    newDirectoryContentsReader(),
-    "foo",
-  );
-
-  assertEquals(directoryLoader.name, "foo");
-
-  const directoryUrl = new URL("test_data/CompleteDirectory", import.meta.url);
-  const contents = await directoryLoader.loadObjectFromDirectory(directoryUrl);
-
+function verifyMergedContents(contents: Record<string, unknown>) {
   // Node.js returns binary data as a Buffer, which is a Uint8Array subclass.
   const binary = contents["binary"];
   assert(binary instanceof Uint8Array);
@@ -245,4 +232,68 @@ test("newDirectoryObjectLoader reads CompleteDirectory", async () => {
       },
     },
   });
+}
+
+test("newDirectoryObjectLoader reads CompleteDirectory, using es-toolkit merge function as default options", async () => {
+  const loaders = newDefaultFileValueLoaders();
+
+  // The merge options we'll use
+  const mergeOptions: DirectoryObjectLoaderOptions = {
+    arrayMergeFunction: merge,
+    objectMergeFunction: merge,
+  };
+
+  // Also demonstrate how to add additional loaders:
+  const binaryLoader = newFileBinaryReader();
+  loaders.set(".bin", newBinaryFileValueLoader(binaryLoader));
+
+  const directoryLoader = newDirectoryObjectLoader(
+    loaders,
+    newDirectoryContentsReader(),
+    "foo",
+    mergeOptions,
+  );
+
+  assertEquals(directoryLoader.name, "foo");
+
+  const directoryUrl = new URL("test_data/CompleteDirectory", import.meta.url);
+  const contents = await directoryLoader.loadObjectFromDirectory(directoryUrl);
+  verifyMergedContents(contents);
+});
+
+test("newDirectoryObjectLoader reads CompleteDirectory, using es-toolkit merge function as explicit options", async () => {
+  const loaders = newDefaultFileValueLoaders();
+
+  // The merge options we'll use
+  const mergeOptions: DirectoryObjectLoaderOptions = {
+    arrayMergeFunction: merge,
+    objectMergeFunction: merge,
+  };
+
+  // Also demonstrate how to add additional loaders:
+  const binaryLoader = newFileBinaryReader();
+  loaders.set(".bin", newBinaryFileValueLoader(binaryLoader));
+
+  const directoryLoader = newDirectoryObjectLoader(
+    loaders,
+    newDirectoryContentsReader(),
+    "foo",
+    {
+      arrayMergeFunction: (_) => {
+        throw Error("should never be called");
+      },
+      objectMergeFunction: (_) => {
+        throw Error("should never be called");
+      },
+    },
+  );
+
+  assertEquals(directoryLoader.name, "foo");
+
+  const directoryUrl = new URL("test_data/CompleteDirectory", import.meta.url);
+  const contents = await directoryLoader.loadObjectFromDirectory(
+    directoryUrl,
+    mergeOptions,
+  );
+  verifyMergedContents(contents);
 });

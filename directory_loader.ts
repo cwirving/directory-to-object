@@ -4,7 +4,7 @@ import type {
   FileValueLoader,
   FileValueLoaderOptions,
 } from "./interfaces.ts";
-import { merge } from "@es-toolkit/es-toolkit";
+import { setOrMergeValue } from "./merge_utilities.ts";
 
 /**
  * This regular expression is what we consider to be a valid file extension.
@@ -43,37 +43,6 @@ export function isRecord(
   }
 
   return false;
-}
-
-/**
- * Set a property value on the target object, unless:
- * - there is already a property on the target
- * - the value of the existing property is a plain JavaScript object
- * - the new value is also a plain JavaScript object
- *
- * ... in which case the existing property value and new value will be merged in place.
- *
- * Note: This is for internal use only. Not part of the public library API.
- *
- * @param target The target plain JavaScript object where the property will be set.
- * @param key The key of the property to set.
- * @param value The new value to set (or merge).
- */
-export function _setOrMergeValue(
-  target: Record<string, unknown>,
-  key: string,
-  value: unknown,
-): void {
-  if (isRecord(value)) {
-    const targetValue = target[key];
-
-    if (isRecord(targetValue)) {
-      merge(targetValue, value);
-      return;
-    }
-  }
-
-  target[key] = value;
 }
 
 /**
@@ -144,12 +113,12 @@ export async function loadObjectFromDirectoryEx(
         );
         if (loaded !== undefined) {
           const [key, value] = loaded;
-          _setOrMergeValue(result, key, value);
+          setOrMergeValue(result, key, value, options);
         }
         break;
       }
       case "directory":
-        _setOrMergeValue(
+        setOrMergeValue(
           result,
           entry.name,
           await loadObjectFromDirectoryEx(

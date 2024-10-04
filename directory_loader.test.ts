@@ -7,7 +7,6 @@ import type {
   FileValueLoaderOptions,
 } from "./interfaces.ts";
 import {
-  _setOrMergeValue,
   isRecord,
   loadObjectFromDirectoryEx,
   loadValueFromFile,
@@ -125,43 +124,6 @@ test("isRecord", () => {
     b = 456;
   }
   assertEquals(isRecord(new Something()), false);
-});
-
-test("_setOrMergeValue plain overwrite cases", () => {
-  const target = {};
-
-  // New values
-  _setOrMergeValue(target, "a", 1);
-  assertEquals(target, { a: 1 });
-  _setOrMergeValue(target, "b", "abc");
-  assertEquals(target, { a: 1, b: "abc" });
-  _setOrMergeValue(target, "c", { x: "yz" });
-  assertEquals(target, { a: 1, b: "abc", c: { x: "yz" } });
-
-  // Overwrites
-  _setOrMergeValue(target, "a", 2);
-  assertEquals(target, { a: 2, b: "abc", c: { x: "yz" } });
-  _setOrMergeValue(target, "a", "foo");
-  assertEquals(target, { a: "foo", b: "abc", c: { x: "yz" } });
-  _setOrMergeValue(target, "a", { foo: "bar" });
-  assertEquals(target, { a: { foo: "bar" }, b: "abc", c: { x: "yz" } });
-});
-
-test("_setOrMergeValue merge cases from es-toolkit documentation", () => {
-  let target: Record<string, unknown> = { a: 1, b: { x: 1, y: 2 } };
-  let source: Record<string, unknown> = { b: { y: 3, z: 4 }, c: 5 };
-  _setOrMergeValue({ data: target }, "data", source);
-  assertEquals(target, { a: 1, b: { x: 1, y: 3, z: 4 }, c: 5 });
-
-  target = { a: [1, 2], b: { x: 1 } };
-  source = { a: [3], b: { y: 2 } };
-  _setOrMergeValue({ data: target }, "data", source);
-  assertEquals(target, { a: [3, 2], b: { x: 1, y: 2 } });
-
-  target = { a: null };
-  source = { a: [1, 2, 3] };
-  _setOrMergeValue({ data: target }, "data", source);
-  assertEquals(target, { a: [1, 2, 3] });
 });
 
 test("loadValueFromFile honors loader iteration order", async () => {

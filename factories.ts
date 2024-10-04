@@ -12,6 +12,7 @@ import {
   validateLoaders,
 } from "./directory_loader.ts";
 import { platform } from "./platform.ts";
+import { mergeOptions } from "./merge_utilities.ts";
 
 /**
  * Create a new text file text reader appropriate for reading local files on the current platform.
@@ -160,12 +161,14 @@ export function newDefaultFileValueLoaders(): Map<string, FileValueLoader> {
  * @param loaders The mappings from file extension to file loader. Note that this can be an ordered array of tuples -- they are checked in order.
  * @param directoryReader The optional directory reader used to determine directory contents. Defaults to a local directory reader.
  * @param name The optional name of the loader.
+ * @param defaultOptions Default options that will be used by the directory object loader. Options provided in calls to `loadObjectFromDirectory` will override these defaults. If both defaults and call options are provided, they are merged.
  * @returns An object implementing interface {@link DirectoryContentsReader}.
  */
 export function newDirectoryObjectLoader(
   loaders: Iterable<Readonly<[string, FileValueLoader]>>,
   directoryReader?: DirectoryContentsReader,
   name?: string,
+  defaultOptions?: Readonly<DirectoryObjectLoaderOptions>,
 ): DirectoryObjectLoader {
   if (directoryReader === undefined) {
     directoryReader = newDirectoryContentsReader();
@@ -177,18 +180,20 @@ export function newDirectoryObjectLoader(
 
   return Object.freeze({
     name: name ?? "Generic directory object loader",
+    _defaultOptions: defaultOptions, // Not used. Just present to make code easier to debug.
     _loaders: loaders, // Not used. Just present to make code easier to debug.
     loadObjectFromDirectory: async (
       path: URL,
-      options?: DirectoryObjectLoaderOptions,
+      options?: Readonly<DirectoryObjectLoaderOptions>,
     ) => {
-      options?.signal?.throwIfAborted();
+      const mergedOptions = mergeOptions(defaultOptions, options);
+      mergedOptions?.signal?.throwIfAborted();
 
       return await loadObjectFromDirectoryEx(
         path,
         clonedLoaders,
         directoryReader,
-        options,
+        mergedOptions,
       );
     },
   });

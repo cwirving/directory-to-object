@@ -2,6 +2,7 @@
   "tasks": {
   },
   "imports": {
+    "@es-toolkit/es-toolkit": "jsr:@es-toolkit/es-toolkit@^1.17.0",
     "@scroogieboy/directory-to-object": "jsr:@scroogieboy/directory-to-object@^0.2.0",
     "@std/path": "jsr:@std/path@^1.0.6",
     "@std/yaml": "jsr:@std/yaml@^1.0.5"

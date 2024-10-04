@@ -171,10 +171,41 @@ export interface FileValueLoader {
 }
 
 /**
+ * The signature of a merge function used by the directory object loader to merge array and
+ * plain JavaScript object values in loaded objects.
+ *
+ * The merge function may or may not have side effects for either existing or new values, but only
+ * the function return value will be assigned by the caller.
+ *
+ * @param existingValue The existing value found in the target object.
+ * @param newValue The newly-loaded value to merge with the existing value.
+ * @returns The merged value to assign in the target object.
+ */
+export type MergeFn<TValue> = (
+  existingValue: TValue,
+  newValue: TValue,
+) => TValue;
+
+/**
  * Options passed to the {@link DirectoryObjectLoader} {@linkcode DirectoryObjectLoader.loadObjectFromDirectory | loadValueFromFile} method.
  */
 export interface DirectoryObjectLoaderOptions
   extends FileValueLoaderOptions, DirectoryContentsReaderOptions {
+  /**
+   * The merge function that will be used to merge array values in loaded objects.
+   * This is only called when both existing and new values are arrays.
+   * If unspecified, the default is to use the new array (i.e., to always overwrite the
+   * existing array).
+   */
+  arrayMergeFunction?: MergeFn<unknown[]>;
+
+  /**
+   * The merge function that will be used to merge plain object values in loaded objects.
+   * This is only called when both existing and new values are plain objects.
+   * If unspecified, the default is to use the new object (i.e., to always overwrite the
+   * existing object).
+   */
+  objectMergeFunction?: MergeFn<Record<string, unknown>>;
 }
 
 /**
@@ -186,8 +217,9 @@ export interface DirectoryObjectLoaderOptions
  * recurse into subdirectories.
  *
  * When there are multiple files with the same base name (resulting in the same property name), their values are
- * merged if possible (they are both plain JavaScript objects) or one overwrites the other if not. There is no
- * ordering promise in either (merge or overwrite) case.
+ * merged if possible (they are both plain JavaScript objects or arrays and the corresponding merge function was
+ * provided in the options) or one overwrites the other if not. There is no ordering promise in either (merge or
+ * overwrite) case.
  */
 export interface DirectoryObjectLoader {
   /**

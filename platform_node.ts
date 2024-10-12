@@ -56,7 +56,7 @@ function nodeLoadBinaryFromFile(
   return fsPromises.readFile(path, {
     encoding: null,
     signal: (options as Abortable | undefined)?.signal,
-  });
+  }) as unknown as Promise<Uint8Array>;
 }
 
 async function nodeLoadDirectoryContents(

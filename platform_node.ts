@@ -2,8 +2,8 @@ import type {
   DirectoryContentsReaderOptions,
   DirectoryEntry,
   DirectoryEntryType,
-  FileBinaryReaderOptions,
-  FileTextReaderOptions,
+  ReadBinaryFromFileOptions,
+  ReadTextFromFileOptions,
 } from "./interfaces.ts";
 import * as fsPromises from "node:fs/promises";
 import type { Dirent } from "node:fs";
@@ -41,7 +41,7 @@ async function direntToType(
 
 function nodeLoadTextFromFile(
   path: URL,
-  options?: FileTextReaderOptions,
+  options?: ReadTextFromFileOptions,
 ): Promise<string> {
   return fsPromises.readFile(path, {
     encoding: "utf-8",
@@ -51,7 +51,7 @@ function nodeLoadTextFromFile(
 
 function nodeLoadBinaryFromFile(
   path: URL,
-  options?: FileBinaryReaderOptions,
+  options?: ReadBinaryFromFileOptions,
 ): Promise<Uint8Array> {
   return fsPromises.readFile(path, {
     encoding: null,
@@ -84,12 +84,9 @@ async function nodeLoadDirectoryContents(
 
 export function makeNodePlatform(): Platform {
   return Object.freeze({
-    fileTextReader: {
-      name: "fs.readFile (utf-8)",
+    fileReader: {
+      name: "Node.js fs.readFile",
       readTextFromFile: nodeLoadTextFromFile,
-    },
-    fileBinaryReader: {
-      name: "fs.readFile (binary)",
       readBinaryFromFile: nodeLoadBinaryFromFile,
     },
     directoryContentsReader: {

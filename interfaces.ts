@@ -11,15 +11,21 @@ export interface WithOptionalSignal {
 }
 
 /**
- * Options passed to the {@link FileTextReader} {@linkcode FileTextReader.readTextFromFile | readTextFromFile} method.
+ * Options passed to the {@link FileReader} {@linkcode FileReader.readTextFromFile | readTextFromFile} method.
  */
-export interface FileTextReaderOptions extends WithOptionalSignal {
+export interface ReadTextFromFileOptions extends WithOptionalSignal {
 }
 
 /**
- * Interface of a reader that can read text files into strings.
+ * Options passed to the {@link FileReader} {@linkcode FileReader.readBinaryFromFile | readBinaryFromFile} method.
  */
-export interface FileTextReader {
+export interface ReadBinaryFromFileOptions extends WithOptionalSignal {
+}
+
+/**
+ * Interface of a reader that can read text files into strings and binary files into `Uint8Array`s..
+ */
+export interface FileReader {
   /**
    * The name of the reader. For runtime debugging purposes.
    */
@@ -34,24 +40,8 @@ export interface FileTextReader {
    */
   readTextFromFile(
     path: URL,
-    options?: Readonly<FileTextReaderOptions>,
+    options?: Readonly<ReadTextFromFileOptions>,
   ): Promise<string>;
-}
-
-/**
- * Options passed to the {@link FileBinaryReader} {@linkcode FileBinaryReader.readBinaryFromFile | readBinaryFromFile} method.
- */
-export interface FileBinaryReaderOptions extends WithOptionalSignal {
-}
-
-/**
- * Interface of a reader that can read binary files into `Uint8Array`s.
- */
-export interface FileBinaryReader {
-  /**
-   * The name of the reader. For runtime debugging purposes.
-   */
-  readonly name: string;
 
   /**
    * Asynchronously read the contents of a file identified by its URL into a `Uint8Array`.
@@ -62,7 +52,7 @@ export interface FileBinaryReader {
    */
   readBinaryFromFile(
     path: URL,
-    options?: Readonly<FileTextReaderOptions>,
+    options?: Readonly<ReadTextFromFileOptions>,
   ): Promise<Uint8Array>;
 }
 
@@ -136,7 +126,7 @@ export interface DirectoryContentsReader {
 /**
  * Options passed to the {@link FileValueLoader} {@linkcode FileValueLoader.loadValueFromFile | loadValueFromFile} method.
  */
-export interface FileValueLoaderOptions extends FileTextReaderOptions {
+export interface FileValueLoaderOptions extends ReadTextFromFileOptions {
 }
 
 /**
@@ -206,6 +196,19 @@ export interface DirectoryObjectLoaderOptions
    * existing object).
    */
   objectMergeFunction?: MergeFn<Record<string, unknown>>;
+
+  /**
+   * If set, the URL of each directory visited will be embedded in the resulting plain JavaScript object as the
+   * property with this name. The value of the property will be the exact `URL` object used to read the directory.
+   */
+  embedDirectoryUrlAs?: string;
+
+  /**
+   * If set, the URL of each file with structured contents visited will be embedded in the resulting plain JavaScript
+   * object as the property with this name. The value of the property will be the exact `URL` object used to read the
+   * file.
+   */
+  embedFileUrlAs?: string;
 }
 
 /**

@@ -9,7 +9,8 @@
   },
   "devDependencies": {
     "@cross/test": "npm:@jsr/cross__test@^0.0.9",
-    "@types/node": "latest"
+    "@types/node": "latest",
+    "tsx": "^4.19.2"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"

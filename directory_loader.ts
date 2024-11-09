@@ -113,6 +113,12 @@ export async function loadObjectFromDirectoryEx(
         );
         if (loaded !== undefined) {
           const [key, value] = loaded;
+
+          // If the caller has requested that we embed file URLs, do it:
+          if (isRecord(value) && typeof options?.embedFileUrlAs === "string") {
+            value[options.embedFileUrlAs] = entry.url;
+          }
+
           setOrMergeValue(result, key, value, options);
         }
         break;
@@ -133,5 +139,11 @@ export async function loadObjectFromDirectoryEx(
         break;
     }
   }
+
+  // If the caller has requested that we embed directory URLs, do it:
+  if (typeof options?.embedDirectoryUrlAs === "string") {
+    result[options.embedDirectoryUrlAs] = path;
+  }
+
   return result;
 }

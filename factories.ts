@@ -2,8 +2,7 @@ import type {
   DirectoryContentsReader,
   DirectoryObjectLoader,
   DirectoryObjectLoaderOptions,
-  FileBinaryReader,
-  FileTextReader,
+  FileReader,
   FileValueLoader,
   FileValueLoaderOptions,
 } from "./interfaces.ts";
@@ -15,25 +14,14 @@ import { platform } from "./platform.ts";
 import { mergeOptions } from "./merge_utilities.ts";
 
 /**
- * Create a new text file text reader appropriate for reading local files on the current platform.
+ * Create a new file reader appropriate for reading local files on the current platform.
  *
- * Text file loaders don't interpret the contents of the file, they just return them as-is (as a string).
+ * File readers don't interpret the contents of the file they read, they just return them as-is.
  *
- * @returns An object implementing the {@link FileTextReader} interface.
+ * @returns An object implementing the {@link FileReader} interface.
  */
-export function newFileTextReader(): FileTextReader {
-  return platform.fileTextReader;
-}
-
-/**
- * Create a new binary file text reader appropriate for reading local files on the current platform.
- *
- * Binary file loaders don't interpret the contents of the file, they just return them as-is (as a `Uint8Array`).
- *
- * @returns An object implementing the {@link FileBinaryReader} interface.
- */
-export function newFileBinaryReader(): FileBinaryReader {
-  return platform.fileBinaryReader;
+export function newFileReader(): FileReader {
+  return platform.fileReader;
 }
 
 /**
@@ -52,7 +40,7 @@ export function newDirectoryContentsReader(): DirectoryContentsReader {
  * @returns An object implementing the {@link FileValueLoader} interface that performs plain text file loading into string values.
  */
 export function newTextFileValueLoader(
-  textReader: FileTextReader,
+  textReader: FileReader,
 ): FileValueLoader {
   return Object.freeze({
     name: "Text file value loader",
@@ -73,7 +61,7 @@ export function newTextFileValueLoader(
  * @returns An object implementing the {@link FileValueLoader} interface.
  */
 export function newBinaryFileValueLoader(
-  binaryReader: FileBinaryReader,
+  binaryReader: FileReader,
 ): FileValueLoader {
   return Object.freeze({
     name: "Binary file value loader",
@@ -101,7 +89,7 @@ export type StringParserFunc = (input: string) => unknown;
  * @returns An object implementing the {@link FileValueLoader} interface.
  */
 export function newStringParserFileValueLoader(
-  textReader: FileTextReader,
+  textReader: FileReader,
   parser: StringParserFunc,
   name: string,
 ): FileValueLoader {
@@ -125,7 +113,7 @@ export function newStringParserFileValueLoader(
  * @returns An object implementing the {@link FileValueLoader} interface which reads and parses JSON files.
  */
 export function newJsonFileValueLoader(
-  textReader: FileTextReader,
+  textReader: FileReader,
 ): FileValueLoader {
   return newStringParserFileValueLoader(
     textReader,
@@ -148,7 +136,7 @@ export function newJsonFileValueLoader(
  * @returns A map of file extensions (as strings, including the dot -- e.g., ".txt") to the corresponding {@link FileValueLoader} to use for that extension.
  */
 export function newDefaultFileValueLoaders(): Map<string, FileValueLoader> {
-  const textReader = newFileTextReader();
+  const textReader = newFileReader();
   return new Map<string, FileValueLoader>([
     [".json", newJsonFileValueLoader(textReader)],
     [".txt", newTextFileValueLoader(textReader)],

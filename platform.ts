@@ -1,11 +1,7 @@
 import { CurrentRuntime, Runtime } from "@cross/runtime";
 import { makeDenoPlatform } from "./platform_deno.ts";
 import { makeNodePlatform } from "./platform_node.ts";
-import type {
-  DirectoryContentsReader,
-  FileBinaryReader,
-  FileTextReader,
-} from "./interfaces.ts";
+import type { DirectoryContentsReader, FileReader } from "./interfaces.ts";
 
 const nodeLikeRuntimes = [Runtime.Bun, Runtime.Node];
 
@@ -14,8 +10,7 @@ export function runtimeIsNodeLike(runtime: Runtime): boolean {
 }
 
 export interface Platform {
-  fileTextReader: FileTextReader;
-  fileBinaryReader: FileBinaryReader;
+  fileReader: FileReader;
   directoryContentsReader: DirectoryContentsReader;
 }
 

@@ -5,8 +5,7 @@ import {
   newDefaultFileValueLoaders,
   newDirectoryContentsReader,
   newDirectoryObjectLoader,
-  newFileBinaryReader,
-  newFileTextReader,
+  newFileReader,
 } from "./factories.ts";
 import type {
   DirectoryEntry,
@@ -14,8 +13,8 @@ import type {
 } from "./interfaces.ts";
 import { merge } from "@es-toolkit/es-toolkit";
 
-test("newFileTextReader: load a file", async () => {
-  const reader = newFileTextReader();
+test("newFileReader: load a file", async () => {
+  const reader = newFileReader();
 
   assertExists(reader, "The text file reader should be created.");
 
@@ -27,8 +26,8 @@ test("newFileTextReader: load a file", async () => {
   assertEquals(fileContents, "This is a test\n");
 });
 
-test("newFileBinaryReader: load a file of zeros", async () => {
-  const reader = newFileBinaryReader();
+test("newFileReader: load a binary file of zeros", async () => {
+  const reader = newFileReader();
 
   assertExists(reader, "The binary file reader should be created.");
 
@@ -49,8 +48,8 @@ test("newFileBinaryReader: load a file of zeros", async () => {
   }
 });
 
-test("newFileBinaryReader: load a file of incrementing numbers", async () => {
-  const reader = newFileBinaryReader();
+test("newFileReader: load a binary file of incrementing numbers", async () => {
+  const reader = newFileReader();
 
   assertExists(reader, "The binary file reader should be created.");
 
@@ -244,8 +243,8 @@ test("newDirectoryObjectLoader reads CompleteDirectory, using es-toolkit merge f
   };
 
   // Also demonstrate how to add additional loaders:
-  const binaryLoader = newFileBinaryReader();
-  loaders.set(".bin", newBinaryFileValueLoader(binaryLoader));
+  const binaryReader = newFileReader();
+  loaders.set(".bin", newBinaryFileValueLoader(binaryReader));
 
   const directoryLoader = newDirectoryObjectLoader(
     loaders,
@@ -271,8 +270,8 @@ test("newDirectoryObjectLoader reads CompleteDirectory, using es-toolkit merge f
   };
 
   // Also demonstrate how to add additional loaders:
-  const binaryLoader = newFileBinaryReader();
-  loaders.set(".bin", newBinaryFileValueLoader(binaryLoader));
+  const binaryReader = newFileReader();
+  loaders.set(".bin", newBinaryFileValueLoader(binaryReader));
 
   const directoryLoader = newDirectoryObjectLoader(
     loaders,

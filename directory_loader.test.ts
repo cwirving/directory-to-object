@@ -197,8 +197,12 @@ test("loadObjectFromDirectoryEx", async () => {
     "file:///dir/a.txt": "a",
     "file:///dir/b.txt": "b",
     "file:///dir/c/d.txt": "d",
+    "file:///dir/e.json": { f: 42 },
   });
-  const loaders: [string, FileValueLoader][] = [[".txt", loader]];
+  const loaders: [string, FileValueLoader][] = [[".txt", loader], [
+    ".json",
+    loader,
+  ]];
 
   const reader = new MockDirectoryContentsReader("reader", {
     "file:///dir": [{
@@ -214,6 +218,10 @@ test("loadObjectFromDirectoryEx", async () => {
       type: "directory",
       url: new URL("file:///dir/c"),
     }, {
+      name: "e.json",
+      type: "file",
+      url: new URL("file:///dir/e.json"),
+    }, {
       name: "x",
       type: "other",
       url: new URL("file:///dir/x"),
@@ -225,17 +233,58 @@ test("loadObjectFromDirectoryEx", async () => {
     }],
   });
 
-  const result = await loadObjectFromDirectoryEx(
+  // Load the object without options
+  const noOptionsResult = await loadObjectFromDirectoryEx(
     new URL("file:///dir"),
     loaders,
     reader,
   );
 
-  assertEquals(result, {
+  assertEquals(noOptionsResult, {
     a: "a",
     b: "b",
     c: {
       d: "d",
+    },
+    e: { f: 42 },
+  });
+
+  // Load the object while embedding directory URLs
+  const embedDirectoryURLResult = await loadObjectFromDirectoryEx(
+    new URL("file:///dir"),
+    loaders,
+    reader,
+    { embedDirectoryUrlAs: "__dir__" },
+  );
+
+  assertEquals(embedDirectoryURLResult, {
+    __dir__: new URL("file:///dir"),
+    a: "a",
+    b: "b",
+    c: {
+      __dir__: new URL("file:///dir/c"),
+      d: "d",
+    },
+    e: { f: 42 },
+  });
+
+  // Load the object while embedding directory URLs
+  const embedFileURLResult = await loadObjectFromDirectoryEx(
+    new URL("file:///dir"),
+    loaders,
+    reader,
+    { embedFileUrlAs: "__file__" },
+  );
+
+  assertEquals(embedFileURLResult, {
+    a: "a",
+    b: "b",
+    c: {
+      d: "d",
+    },
+    e: {
+      __file__: new URL("file:///dir/e.json"),
+      f: 42,
     },
   });
 });

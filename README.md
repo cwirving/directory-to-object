@@ -1,4 +1,4 @@
-# Directory-To-Object: A configuration directory reader
+# Directory-To-Object: A configuration directory loader
 
 ## Introduction and rationale
 
@@ -69,6 +69,7 @@ The main concepts in the library are:
   method)
 - Directory contents readers (which list the contents of directories)
 - File value loaders (which read the contents of files into JavaScript values)
+- File readers that perform the low-level file reading used by file value loaders
 
 The top-level `loadObjectFromDirectory` function is a convenience wrapper around
 default implementations of these concepts.
@@ -89,8 +90,8 @@ system directories.
 ### Changing how files are read and adding new file formats
 
 The `newTextFileValueLoader`, `newBinaryFileValueLoader` and
-`newJsonFileValueLoader` factory functions create text file, JSON file and
-binary file loaders, respectively.
+`newJsonFileValueLoader` factory functions create text, binary and JSON file
+loaders, respectively.
 
 The file value loaders in the library are constructed by passing them a file
 reader implementation. This separates the concerns of loading the binary bits
@@ -103,11 +104,11 @@ them to the `fileValueLoaders` map. For example:
 import {
   fileValueLoaders,
   newBinaryFileValueLoader,
-  newFileBinaryReader,
+  newFileReader,
 } from "@scroogieboy/directory-to-object";
 
 // Create a binary file loader
-const binaryLoader = newBinaryFileValueLoader(newFileBinaryReader());
+const binaryLoader = newBinaryFileValueLoader(newFileReader());
 
 // Add this new binary loader to the loaders known by the `loadObjectFromDirectory` function.
 fileValueLoaders.set(".bin", binaryLoader);
@@ -124,13 +125,13 @@ For example, to add YAML support,
 import * as YAML from "@std/yaml";
 import {
   fileValueLoaders,
-  newFileTextReader,
+  newFileReader,
   newStringParserFileValueLoader,
 } from "@scroogieboy/directory-to-object";
 
 // Create a YAML file loader
 const yamlLoader = newStringParserFileValueLoader(
-  newFileTextReader(),
+  newFileReader(),
   YAML.parse,
   "YAML file value loader",
 );
@@ -173,18 +174,19 @@ import {
   newBinaryFileValueLoader,
   newDirectoryContentsReader,
   newDirectoryObjectLoader,
-  newFileBinaryReader,
-  newFileTextReader,
+  newFileReader,
   newStringParserFileValueLoader,
 } from "@scroogieboy/directory-to-object";
 
+const reader = newFileReader();
+
 const yamlLoader = newStringParserFileValueLoader(
-  newFileTextReader(),
+  reader,
   YAML.parse,
   "YAML file value loader",
 );
 
-const binaryLoader = newBinaryFileValueLoader(newFileBinaryReader());
+const binaryLoader = newBinaryFileValueLoader(reader);
 
 const loaders: [string, FileValueLoader][] = [
   [".yaml", yamlLoader],

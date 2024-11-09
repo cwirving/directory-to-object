@@ -1,13 +1,13 @@
 import * as YAML from "@std/yaml";
 import {
   fileValueLoaders,
-  newFileTextReader,
+  newFileReader,
   newStringParserFileValueLoader,
 } from "@scroogieboy/directory-to-object";
 
 // Create a YAML file loader
 const yamlLoader = newStringParserFileValueLoader(
-  newFileTextReader(),
+  newFileReader(),
   YAML.parse,
   "YAML file value loader",
 );

@@ -5,18 +5,19 @@ import {
   newBinaryFileValueLoader,
   newDirectoryContentsReader,
   newDirectoryObjectLoader,
-  newFileBinaryReader,
-  newFileTextReader,
+  newFileReader,
   newStringParserFileValueLoader,
 } from "@scroogieboy/directory-to-object";
 
+const reader = newFileReader()
+
 const yamlLoader = newStringParserFileValueLoader(
-  newFileTextReader(),
+  reader,
   YAML.parse,
   "YAML file value loader",
 );
 
-const binaryLoader = newBinaryFileValueLoader(newFileBinaryReader());
+const binaryLoader = newBinaryFileValueLoader(reader);
 
 const loaders: [string, FileValueLoader][] = [
   [".yaml", yamlLoader],

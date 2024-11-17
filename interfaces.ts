@@ -52,7 +52,7 @@ export interface FileReader {
    */
   readBinaryFromFile(
     path: URL,
-    options?: Readonly<ReadTextFromFileOptions>,
+    options?: Readonly<ReadBinaryFromFileOptions>,
   ): Promise<Uint8Array>;
 }
 

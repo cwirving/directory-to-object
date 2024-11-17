@@ -1,6 +1,6 @@
 {
   "name": "@scroogieboy/directory-to-object",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "exports": "./mod.ts",
   "tasks": {
     "check": "deno check *.ts",

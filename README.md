@@ -69,7 +69,8 @@ The main concepts in the library are:
   method)
 - Directory contents readers (which list the contents of directories)
 - File value loaders (which read the contents of files into JavaScript values)
-- File readers that perform the low-level file reading used by file value loaders
+- File readers that perform the low-level file reading used by file value
+  loaders
 
 The top-level `loadObjectFromDirectory` function is a convenience wrapper around
 default implementations of these concepts.

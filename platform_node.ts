@@ -85,7 +85,7 @@ async function nodeLoadDirectoryContents(
 export function makeNodePlatform(): Platform {
   return Object.freeze({
     fileReader: {
-      name: "Node.js fs.readFile",
+      name: "fs.readFile",
       readTextFromFile: nodeLoadTextFromFile,
       readBinaryFromFile: nodeLoadBinaryFromFile,
     },

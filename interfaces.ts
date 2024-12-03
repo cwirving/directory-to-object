@@ -126,7 +126,8 @@ export interface DirectoryContentsReader {
 /**
  * Options passed to the {@link FileValueLoader} {@linkcode FileValueLoader.loadValueFromFile | loadValueFromFile} method.
  */
-export interface FileValueLoaderOptions extends ReadTextFromFileOptions {
+export interface FileValueLoaderOptions
+  extends ReadTextFromFileOptions, ReadBinaryFromFileOptions {
 }
 
 /**
@@ -209,6 +210,18 @@ export interface DirectoryObjectLoaderOptions
    * file.
    */
   embedFileUrlAs?: string;
+
+  /**
+   * If specified, file and directory names will be passed through this decoding function before using them to create
+   * properties in the object. This allows properties to have names that would be forbidden by the file system
+   * (e.g., "/"): define a file name encoding convention and decode it via this option.
+   *
+   * By default, there is no decoding of names.
+   *
+   * @param name The name of the file or directory being read.
+   * @returns The decoded name of the corresponding property to create/update.
+   */
+  propertyNameDecoder?: (name: string) => string;
 }
 
 /**

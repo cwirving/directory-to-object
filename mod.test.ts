@@ -10,6 +10,9 @@ test("loadObjectFromDirectory reads SimpleDirectory", async () => {
     json: {
       foo: "bar",
     },
+    subdirectory: {
+      text: "another test\n",
+    },
     text: "This is a test\n",
   });
 });

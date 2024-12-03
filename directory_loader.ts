@@ -101,6 +101,7 @@ export async function loadObjectFromDirectoryEx(
 ): Promise<Record<string, unknown>> {
   const result: Record<string, unknown> = {};
   const contents = await directoryReader.loadDirectoryContents(path, options);
+  const propertyNameDecoder = options?.propertyNameDecoder ?? ((name) => name);
 
   for (const entry of contents) {
     switch (entry.type) {
@@ -119,14 +120,14 @@ export async function loadObjectFromDirectoryEx(
             value[options.embedFileUrlAs] = entry.url;
           }
 
-          setOrMergeValue(result, key, value, options);
+          setOrMergeValue(result, propertyNameDecoder(key), value, options);
         }
         break;
       }
       case "directory":
         setOrMergeValue(
           result,
-          entry.name,
+          propertyNameDecoder(entry.name),
           await loadObjectFromDirectoryEx(
             entry.url,
             loaders,

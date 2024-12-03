@@ -204,7 +204,32 @@ test("newDirectoryObjectLoader reads SimpleDirectory", async () => {
     json: {
       foo: "bar",
     },
+    subdirectory: {
+      text: "another test\n",
+    },
     text: "This is a test\n",
+  });
+});
+
+test("newDirectoryObjectLoader reads SimpleDirectory with name decoding", async () => {
+  const directoryLoader = newDirectoryObjectLoader(
+    newDefaultFileValueLoaders(),
+  );
+
+  const directoryUrl = new URL("test_data/SimpleDirectory", import.meta.url);
+  const contents = await directoryLoader.loadObjectFromDirectory(directoryUrl, {
+    // Use a decoder that uppercases names. All the properties loaded from disk will be uppercase, now.
+    propertyNameDecoder: (name: string) => name.toUpperCase(),
+  });
+
+  assertEquals(contents, {
+    JSON: {
+      foo: "bar",
+    },
+    SUBDIRECTORY: {
+      TEXT: "another test\n",
+    },
+    TEXT: "This is a test\n",
   });
 });
 

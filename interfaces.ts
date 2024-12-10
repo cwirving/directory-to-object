@@ -276,6 +276,37 @@ export interface ValueLoader<TValue> {
 }
 
 export interface FluentLoader<TValue> extends ValueLoader<TValue> {
+  /**
+   * Convenience wrapper around the {@linkcode loadValue} method that takes a directory URL as input and takes care
+   * of the boilerplate to call {@linkcode canLoadValue} and {@linkcode loadValue} on the value loader.
+   *
+   * **Note:** The fact that this method is present does not mean that the loader is actually able to load directories.
+   * If it cannot load the directory, this method will reject with an error.
+   *
+   * @param directoryUrl - The URL of the directory to be loaded.
+   * @param options - Optional configuration for loading and processing the directory contents.
+   * @returns A promise that resolves to the loaded and processed value.
+   */
+  loadDirectory(
+    directoryUrl: URL,
+    options?: Readonly<ValueLoaderOptions>,
+  ): Promise<TValue>;
+
+  /**
+   * Convenience wrapper around the {@linkcode loadValue} method that takes a file URL as input and takes care
+   * of the boilerplate to call {@linkcode canLoadValue} and {@linkcode loadValue} on the value loader.
+   *
+   * **Note:** The fact that this method is present does not mean that the loader is actually able to load files.
+   * If it cannot load the file, this method will reject with an error.
+   *
+   * @param fileUrl - The URL of the file to be loaded.
+   * @param options - Optional configuration for loading the file contents.
+   * @returns A promise that resolves to the loaded value.
+   */
+  loadFile(
+    fileUrl: URL,
+    options?: Readonly<ValueLoaderOptions>,
+  ): Promise<TValue>;
 }
 
 export interface FileLoaderBuildOptions {

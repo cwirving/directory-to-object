@@ -4,7 +4,7 @@ import {
   DefaultLoaderBuilder,
   newDirectoryContentsReader,
   newFileReader,
-} from './factories.ts';
+} from "./factories.ts";
 import type { DirectoryEntry, ValueLoaderOptions } from "./interfaces.ts";
 import { merge } from "@es-toolkit/es-toolkit";
 
@@ -149,7 +149,10 @@ test("newDirectoryContentsReader: read a directory (aborted)", async () => {
 });
 
 test("newDefaultValueLoaders: returns the expected defaults", async () => {
-  const builder = new DefaultLoaderBuilder(newFileReader(), newDirectoryContentsReader());
+  const builder = new DefaultLoaderBuilder(
+    newFileReader(),
+    newDirectoryContentsReader(),
+  );
   const loaders = builder.defaults();
 
   // Update these when we add more loaders to the defaults.

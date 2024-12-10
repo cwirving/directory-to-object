@@ -1,39 +1,28 @@
 import * as YAML from "@std/yaml";
 import { toFileUrl } from "@std/path";
-import {
-  type FileValueLoader,
-  newBinaryFileValueLoader,
-  newDirectoryContentsReader,
-  newDirectoryObjectLoader,
-  newFileReader,
-  newStringParserFileValueLoader,
-} from "@scroogieboy/directory-to-object";
+import { Loaders } from "@scroogieboy/directory-to-object";
 
-const reader = newFileReader()
+const yamlLoader = Loaders.customFile({
+  extension: ".yaml",
+  name: "YAML file value loader",
+  parser: YAML.parse,
+  });
 
-const yamlLoader = newStringParserFileValueLoader(
-  reader,
-  YAML.parse,
-  "YAML file value loader",
-);
+const binaryLoader = Loaders.binaryFile();
 
-const binaryLoader = newBinaryFileValueLoader(reader);
-
-const loaders: [string, FileValueLoader][] = [
-  [".yaml", yamlLoader],
-  [".bin", binaryLoader],
-];
+const loaders = [yamlLoader, binaryLoader];
 
 // Create an object loader with exactly the loaders we created above.
-const directoryLoader = newDirectoryObjectLoader(
-  loaders,
-  newDirectoryContentsReader(),
-);
+const directoryLoader = Loaders.directoryAsObject({
+  loaders: loaders,
+});
 
 const directoryUrl = new URL(
   toFileUrl(await Deno.realPath("./my-config-directory")),
 );
-const configuration = directoryLoader.loadObjectFromDirectory(directoryUrl);
+
+// Use the `loadDirectory` convenience method to load the directory contents.
+const configuration = directoryLoader.loadDirectory(directoryUrl);
 
 // Pretty-print the configuration
 console.log(configuration, null, 2);

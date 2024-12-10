@@ -94,63 +94,53 @@ The `newTextFileValueLoader`, `newBinaryFileValueLoader` and
 `newJsonFileValueLoader` factory functions create text, binary and JSON file
 loaders, respectively.
 
-The file value loaders in the library are constructed by passing them a file
-reader implementation. This separates the concerns of loading the binary bits
-from the parsing and processing of file formats.
+The file value loaders in the library are constructed using the loader builder
+exported as `Loaders`.
 
 New file value loaders can be added to the readers used by default by adding
-them to the `fileValueLoaders` map. For example:
+them to the `defaultLoaders` array. For example:
 
 ```typescript
-import {
-  fileValueLoaders,
-  newBinaryFileValueLoader,
-  newFileReader,
-} from "@scroogieboy/directory-to-object";
+import { defaultLoaders, Loaders } from "@scroogieboy/directory-to-object";
 
 // Create a binary file loader
-const binaryLoader = newBinaryFileValueLoader(newFileReader());
+const binaryLoader = Loaders.binaryFile();
 
 // Add this new binary loader to the loaders known by the `loadObjectFromDirectory` function.
-fileValueLoaders.set(".bin", binaryLoader);
+defaultLoaders.push(binaryLoader);
 ```
 
-Another common case is to add new file formats to parse. The library includes a
-convenient hepler function called `newStringParserFileValueLoader`, which
-produces a new file value reader from a file contents reader and a parser (with
-a signature similar to `JSON.parse`).
+Another common case is to add new file formats to parse. The loader builder
+includes the `customFile` method, which produces a new file value reader given a
+caller-supplied parser function (with a signature similar to `JSON.parse`).
 
 For example, to add YAML support,
 
 ```typescript
 import * as YAML from "@std/yaml";
-import {
-  fileValueLoaders,
-  newFileReader,
-  newStringParserFileValueLoader,
-} from "@scroogieboy/directory-to-object";
+import { defaultLoaders, Loaders } from "@scroogieboy/directory-to-object";
 
 // Create a YAML file loader
-const yamlLoader = newStringParserFileValueLoader(
-  newFileReader(),
-  YAML.parse,
-  "YAML file value loader",
-);
+const yamlLoader = Loaders.customFile({
+  extension: ".yaml",
+  name: "YAML file value loader",
+  parser: YAML.parse,
+});
 
-// Add it for the ".yaml" extension
-fileValueLoaders.set(".yaml", yamlLoader);
+// Add it to the default loaders
+defaultLoaders.push(yamlLoader);
 ```
 
-### Taking control: using `newDirectoryObjectLoader`
+### Taking control: using the `Loaders` builder
 
-The `newDirectoryObjectLoader` function allows the caller to construct a
-directory object loader with exactly the readers and loaders they need. The
-`newDirectoryObjectLoader` function also takes default option values that will
-be merged with the values passed to the `loadObjectFromDirectory` method at
-runtime, so that common options can be set once rather than repeatedly passed
-in. The options passed in to the `loadObjectFromDirectory` method override the
-defaults on an option-by-option basis -- for example, allowing the caller to set
-the merge functions as a default, but specifying a signal every individual call.
+The `Loaders.directoryAsObject` function allows the caller to construct a
+directory object loader with exactly file loaders they need. The
+`Loaders.directoryAsObject` function also takes default option values that will
+be merged with the values passed to the `loadValue` method at runtime, so that
+common options can be set once rather than repeatedly passed in. The options
+passed in to the `loadValue` method override the defaults on an option-by-option
+basis -- for example, allowing the caller to set the merge functions as a
+default, but specifying a signal every individual call.
 
 The use of merge functions is especially valuable when supporting multiple file
 formats that parse to objects. For example, if both YAML and JSON files are
@@ -170,40 +160,29 @@ YAML (".yaml") files:
 ```typescript
 import * as YAML from "@std/yaml";
 import { toFileUrl } from "@std/path";
-import {
-  type FileValueLoader,
-  newBinaryFileValueLoader,
-  newDirectoryContentsReader,
-  newDirectoryObjectLoader,
-  newFileReader,
-  newStringParserFileValueLoader,
-} from "@scroogieboy/directory-to-object";
+import { Loaders } from "@scroogieboy/directory-to-object";
 
-const reader = newFileReader();
+const yamlLoader = Loaders.customFile({
+  extension: ".yaml",
+  name: "YAML file value loader",
+  parser: YAML.parse,
+});
 
-const yamlLoader = newStringParserFileValueLoader(
-  reader,
-  YAML.parse,
-  "YAML file value loader",
-);
+const binaryLoader = Loaders.binaryFile();
 
-const binaryLoader = newBinaryFileValueLoader(reader);
-
-const loaders: [string, FileValueLoader][] = [
-  [".yaml", yamlLoader],
-  [".bin", binaryLoader],
-];
+const loaders = [yamlLoader, binaryLoader];
 
 // Create an object loader with exactly the loaders we created above.
-const directoryLoader = newDirectoryObjectLoader(
-  loaders,
-  newDirectoryContentsReader(),
-);
+const directoryLoader = Loaders.directoryAsObject({
+  loaders: loaders,
+});
 
 const directoryUrl = new URL(
   toFileUrl(await Deno.realPath("./my-config-directory")),
 );
-const configuration = directoryLoader.loadObjectFromDirectory(directoryUrl);
+
+// Use the `loadDirectory` convenience method to load the directory contents.
+const configuration = directoryLoader.loadDirectory(directoryUrl);
 
 // Pretty-print the configuration
 console.log(configuration, null, 2);
@@ -215,29 +194,25 @@ properties from different files:
 ```typescript
 import { toFileUrl } from "@std/path";
 import { merge, union } from "@es-toolkit/es-toolkit";
-import {
-  fileValueLoaders,
-  newDirectoryContentsReader,
-  newDirectoryObjectLoader,
-} from "@scroogieboy/directory-to-object";
+import { defaultLoaders, Loaders } from "@scroogieboy/directory-to-object";
 
-// Create an object loader that loads the default file extensions and merges
+// Create a directory to object loader that loads the default file extensions and merges
 // any arrays and objects that overlap between loaded files using
 // [es-toolkit](https://es-toolkit.slash.page) functions.
-const directoryLoader = newDirectoryObjectLoader(
-  fileValueLoaders,
-  newDirectoryContentsReader(),
-  "My directory loader",
-  {
+const directoryLoader = Loaders.directoryAsObject({
+  loaders: defaultLoaders,
+  name: "My directory loader",
+  defaultOptions: {
     arrayMergeFunction: union,
     objectMergeFunction: merge,
   },
-);
+});
 
 const directoryUrl = new URL(
   toFileUrl(await Deno.realPath("./my-config-directory")),
 );
-const configuration = directoryLoader.loadObjectFromDirectory(directoryUrl);
+
+const configuration = directoryLoader.loadDirectory(directoryUrl);
 
 // Pretty-print the configuration
 console.log(configuration, null, 2);

@@ -1,150 +1,136 @@
 import type {
   DirectoryContentsReader,
-  DirectoryObjectLoaderOptions,
-  FileValueLoader,
-  FileValueLoaderOptions,
+  DirectoryEntryInContext,
+  ValueLoader,
+  ValueLoaderOptions,
 } from "./interfaces.ts";
-import { setOrMergeValue } from "./merge_utilities.ts";
+import { mergeOptions, setOrMergeValue } from "./merge_utilities.ts";
+import { isRecord } from "./is_record.ts";
 
 /**
- * This regular expression is what we consider to be a valid file extension.
- */
-const _validExtensionRegex = /^(\.\w+)+$/;
-
-/**
- * Make sure that the file value loaders are valid (have valid file name extensions).
+ * DirectoryValueLoader is responsible for loading the values from directory entries.
  *
- * @param loaders
+ * It implements the ValueLoader interface and can load directory entries of type "directory".
  */
-export function validateLoaders(
-  loaders: Iterable<Readonly<[string, FileValueLoader]>>,
-): void {
-  for (const [key, _value] of loaders) {
-    if (_validExtensionRegex.exec(key) === null) {
-      throw new Error(`"${key}" is not a valid file extension`);
-    }
-  }
-}
+export class DirectoryValueLoader
+  implements ValueLoader<Record<string, unknown>> {
+  readonly name: string;
+  readonly #loaders: ValueLoader<unknown>[];
+  readonly #directoryReader: DirectoryContentsReader;
+  readonly #defaultOptions: Readonly<ValueLoaderOptions> | undefined;
 
-/**
- * Check that a value is a plain JavaScript object (i.e., not a class instance).
- *
- * @param candidate The value to introspect.
- */
-export function isRecord(
-  candidate: unknown,
-): candidate is Record<string, unknown> {
-  if (
-    typeof candidate === "object" && candidate !== null &&
-    !Array.isArray(candidate)
+  constructor(
+    name: string,
+    loaders: Iterable<ValueLoader<unknown>>,
+    directoryReader: DirectoryContentsReader,
+    defaultOptions?: Readonly<ValueLoaderOptions>,
   ) {
-    const proto = Object.getPrototypeOf(candidate);
-    return proto === null || proto === Object.prototype;
+    this.name = name;
+    const clonedLoaders = Array.from(loaders);
+    clonedLoaders.push(this);
+    this.#loaders = clonedLoaders;
+    this.#directoryReader = directoryReader;
+    this.#defaultOptions = defaultOptions;
   }
 
-  return false;
-}
+  /**
+   * We only can load directories.
+   *
+   * @param entry The directory entry to examine.
+   * @returns `true` if the entry is of type "directory".
+   */
+  canLoadValue(entry: DirectoryEntryInContext): boolean | Promise<boolean> {
+    return entry.type === "directory";
+  }
 
-/**
- * Load the value of a file, using the file value loaders specified. The loaders are
- * examined in iteration order to determine which will be used: the first loader that
- * (case-sensitively) matches the file name extension will be used with no fallback.
- *
- * @param name The name of the file, including extension.
- * @param path The URL of the file. I.e., `file:` URL for local files.
- * @param loaders The file value loaders to consider for the file.
- * @param options Options to pass to the file value loader used.
- * @returns The value of the loaded file (could be any valid JavaScript data type) or `undefined` if there was no file value loader for the extension.
- */
-export async function loadValueFromFile(
-  name: string,
-  path: URL,
-  loaders: Iterable<Readonly<[string, FileValueLoader]>>,
-  options?: FileValueLoaderOptions,
-): Promise<[string, unknown] | undefined> {
-  for (const [extension, fileLoader] of loaders) {
-    if (name.endsWith(extension)) {
-      const key = name.substring(0, name.length - extension.length);
-      const value = await fileLoader.loadValueFromFile(path, options);
-      return [key, value];
+  /**
+   * Determines the key for the provided directory entry -- since we only handle directories, it is the directory name.
+   *
+   * @param entry - The directory entry from which the key will be computed.
+   * @returns The name of the directory.
+   */
+  computeKey(entry: DirectoryEntryInContext): string | undefined {
+    return entry.name;
+  }
+
+  /**
+   * Loads the value of a directory entry and returns it as a plain JavaScript object.
+   *
+   * @param entry The directory entry to load. Must be of type "directory".
+   * @param options Optional configuration parameters for the value loader.
+   * @returns A promise that resolves to a plain JavaScript object containing the loaded values.
+   * @throws {TypeError} If the entry is not a directory.
+   * @throws {Error} If in strict mode and an entry cannot be loaded.
+   */
+  async loadValue(
+    entry: DirectoryEntryInContext,
+    options?: Readonly<ValueLoaderOptions>,
+  ): Promise<Record<string, unknown>> {
+    if (entry.type !== "directory") {
+      throw new TypeError(
+        `Directory value loader attempting to load a non-directory from "${entry.url.href}"`,
+      );
     }
-  }
 
-  // We don't want to throw an exception here because this is not an error.
-  // We'll be scanning directories will all sorts of other junk in them in addition
-  // to the files intended to be loaded, so throwing here would just be painful.
-  return undefined;
-}
+    const mergedOptions = mergeOptions(this.#defaultOptions, options);
+    mergedOptions?.signal?.throwIfAborted();
 
-/**
- * Generic implementation of a directory to object loader. Loads the contents of a directory
- * as a plain JavaScript object, using the {@linkcode loadValueFromFile} function to load
- * the values of files in the directory into properties named like the extension-less file name.
- *
- * The difference between this and the module-level `loadObjectFromDirectory` function is
- * that is the inner, fully-parameterized, version of the function. The module-level function
- * is a convenience, this is the inner plumbing.
- *
- * The naming is a wink to the Microsoft convention of old where Windows APIs had basic versions
- * and "Ex" versions with more parameters.
- *
- * @param path The URL of the directory to load. I.e., `file:` URL for local directories.
- * @param loaders The file value loaders to consider when loading directory contents.
- * @param directoryReader The directory reader implementation to use to read the directory listing.
- * @param options Options to pass to the directory reader and file value loaders as they are called.
- */
-export async function loadObjectFromDirectoryEx(
-  path: URL,
-  loaders: Iterable<Readonly<[string, FileValueLoader]>>,
-  directoryReader: DirectoryContentsReader,
-  options?: DirectoryObjectLoaderOptions,
-): Promise<Record<string, unknown>> {
-  const result: Record<string, unknown> = {};
-  const contents = await directoryReader.loadDirectoryContents(path, options);
-  const propertyNameDecoder = options?.propertyNameDecoder ?? ((name) => name);
+    const result: Record<string, unknown> = {};
+    const contents = await this.#directoryReader.loadDirectoryContents(
+      entry.url,
+      options,
+    );
+    const propertyNameDecoder = mergedOptions?.propertyNameDecoder ??
+      ((name) => name);
 
-  for (const entry of contents) {
-    switch (entry.type) {
-      case "file": {
-        const loaded = await loadValueFromFile(
-          entry.name,
-          entry.url,
-          loaders,
-          options,
-        );
-        if (loaded !== undefined) {
-          const [key, value] = loaded;
+    for (const directoryEntry of contents as DirectoryEntryInContext[]) {
+      directoryEntry.relativePath =
+        `${entry.relativePath}/${directoryEntry.name}`;
+      let loaded = false;
 
-          // If the caller has requested that we embed file URLs, do it:
-          if (isRecord(value) && typeof options?.embedFileUrlAs === "string") {
-            value[options.embedFileUrlAs] = entry.url;
+      for (const loader of this.#loaders) {
+        const canLoadEntryMaybePromise = loader.canLoadValue(directoryEntry);
+        if (
+          (canLoadEntryMaybePromise instanceof Promise)
+            ? await canLoadEntryMaybePromise
+            : canLoadEntryMaybePromise
+        ) {
+          const key = loader.computeKey(directoryEntry);
+          if (key !== undefined) {
+            const value = await loader.loadValue(directoryEntry, mergedOptions);
+
+            // If the caller has requested that we embed file URLs, do it:
+            if (
+              directoryEntry.type === "file" && isRecord(value) &&
+              typeof mergedOptions?.embedFileUrlAs === "string"
+            ) {
+              value[mergedOptions.embedFileUrlAs] = directoryEntry.url;
+            }
+
+            setOrMergeValue(
+              result,
+              propertyNameDecoder(key),
+              value,
+              mergedOptions,
+            );
           }
-
-          setOrMergeValue(result, propertyNameDecoder(key), value, options);
+          loaded = true;
+          break;
         }
-        break;
       }
-      case "directory":
-        setOrMergeValue(
-          result,
-          propertyNameDecoder(entry.name),
-          await loadObjectFromDirectoryEx(
-            entry.url,
-            loaders,
-            directoryReader,
-            options,
-          ),
+
+      if (mergedOptions?.strict && !loaded) {
+        throw new Error(
+          `Directory entry at "${directoryEntry.url}" cannot be loaded`,
         );
-        break;
-      default:
-        break;
+      }
     }
-  }
 
-  // If the caller has requested that we embed directory URLs, do it:
-  if (typeof options?.embedDirectoryUrlAs === "string") {
-    result[options.embedDirectoryUrlAs] = path;
-  }
+    // If the caller has requested that we embed directory URLs, do it:
+    if (typeof options?.embedDirectoryUrlAs === "string") {
+      result[options.embedDirectoryUrlAs] = entry.url;
+    }
 
-  return result;
+    return result;
+  }
 }

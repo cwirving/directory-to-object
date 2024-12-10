@@ -1,5 +1,5 @@
 /**
- * Our own equivalent to the Node.js `Abortable` type. Unfortunately, the Deno and Node.js
+ * Our own equivalent to the Node.js `Abortable` interface. Unfortunately, the Deno and Node.js
  * `AbortSignal` types aren't completely identical, so using `Abortable` directly causes
  * type checking issues.
  */
@@ -71,7 +71,7 @@ export interface DirectoryEntry {
   /**
    * The name of the directory entry, without any path, but with its extension.
    */
-  readonly name: string;
+  name: string;
 
   /**
    * The type of the directory entry -- "file", "directory" or "other".
@@ -115,7 +115,7 @@ export interface DirectoryContentsReader {
    *
    * @param path The URL of the directory to read.
    * @param options Options to apply to the reader.
-   * @returns A promise to an array of objects implementing the {@link DirectoryEntry} interface, each representing a file in the directory.
+   * @returns A promise to an array of **mutable** objects implementing the {@link DirectoryEntry} interface, each representing a file/directory in the directory.
    */
   loadDirectoryContents(
     path: URL,
@@ -124,7 +124,8 @@ export interface DirectoryContentsReader {
 }
 
 /**
- * Options passed to the {@link FileValueLoader} {@linkcode FileValueLoader.loadValueFromFile | loadValueFromFile} method.
+ * Options passed to the {@link ValueLoader} {@linkcode ValueLoader.loadValue | loadValue} method when the loader is
+ * a file-based loader.
  */
 export interface FileValueLoaderOptions
   extends ReadTextFromFileOptions, ReadBinaryFromFileOptions {
@@ -141,25 +142,6 @@ export interface FileValueLoaderOptions
  * can create their own loaders for any format they choose and represent the loaded result as any
  * JavaScript value.
  */
-export interface FileValueLoader {
-  /**
-   * The name of the loader. For runtime debugging purposes.
-   */
-  readonly name: string;
-
-  /**
-   * Asynchronously load (read and parse) the file at the specified URL. The exact parsing
-   * depends on the implementation.
-   *
-   * @param path The URL of the file to load.
-   * @param options Options governing the behavior of the loader.
-   * @returns A promise to a JavaScript value. There are no magic values, any value including `undefined` is valid.
-   */
-  loadValueFromFile(
-    path: URL,
-    options?: Readonly<FileValueLoaderOptions>,
-  ): Promise<unknown>;
-}
 
 /**
  * The signature of a merge function used by the directory object loader to merge array and
@@ -178,9 +160,9 @@ export type MergeFn<TValue> = (
 ) => TValue;
 
 /**
- * Options passed to the {@link DirectoryObjectLoader} {@linkcode DirectoryObjectLoader.loadObjectFromDirectory | loadValueFromFile} method.
+ * Options passed to the {@link ValueLoader} {@linkcode DirectoryObjectLoader.loadObjectFromDirectory | loadValueFromFile} method.
  */
-export interface DirectoryObjectLoaderOptions
+export interface ValueLoaderOptions
   extends FileValueLoaderOptions, DirectoryContentsReaderOptions {
   /**
    * The merge function that will be used to merge array values in loaded objects.
@@ -222,11 +204,32 @@ export interface DirectoryObjectLoaderOptions
    * @returns The decoded name of the corresponding property to create/update.
    */
   propertyNameDecoder?: (name: string) => string;
+
+  /**
+   * If true, the directory value loader will reject with an error when there are directory entries that have not been
+   * handled by a loader.
+   */
+  strict?: boolean;
 }
 
 /**
- * Interface of a directory object loader.
+ * Extension of {@linkcode DirectoryEntry} to include contextual information (the relative path within the overall
+ * directory structure where this entry can be found).
+ */
+export interface DirectoryEntryInContext extends DirectoryEntry {
+  /**
+   * The path, relative to the root of the directory structure being loaded of this entry. Note that this is the
+   * traversal path starting at the root, not the actual file system path -- if the underlying storage is not a
+   * traditional file system (e.g., hyperlinked documents on the web), there may be no relationship between the
+   * paths of various file/directory URLs in the structure.
+   */
+  relativePath: string;
+}
+
+/**
+ * Interface of a value loader.
  *
+ * TODO: fix this documentation
  * Directory object loaders read the contents of a directory specified by its URL into a plain JavasScript object.
  * The exact behavior depends on the loader, but the standard behavior implemented in this library is to
  * list directory contents, use registered file value loaders to load the individual files in the directory and
@@ -237,21 +240,83 @@ export interface DirectoryObjectLoaderOptions
  * provided in the options) or one overwrites the other if not. There is no ordering promise in either (merge or
  * overwrite) case.
  */
-export interface DirectoryObjectLoader {
+export interface ValueLoader<TValue> {
   /**
    * The name of the loader. For runtime debugging purposes.
    */
   readonly name: string;
 
   /**
-   * Asynchronously load a directory as a plain JavaScript object.
+   * Synchronously or asynchronously determine if this loader can handle the specified file/directory.
    *
-   * @param path The URL of the directory to load.
+   * @param entry The directory entry in context describing the file/directory.
+   * @returns `true` or a promise that resolved to `true` if this loader can handle the file/directory at the source URL.
+   */
+  canLoadValue(entry: DirectoryEntryInContext): boolean | Promise<boolean>;
+
+  /**
+   * Compute the key where the file/directory value should be located in the resulting JavaScript object.
+   *
+   * @param entry The directory entry in context describing the file/directory.
+   * @returns The key where the loaded value should be located in the resulting object or `undefined` if the value should not be requested or stored (i.e., this entry should be considered as handled but ignored).
+   */
+  computeKey(entry: DirectoryEntryInContext): string | undefined;
+
+  /**
+   * Asynchronously load the value of a file or directory.
+   *
+   * @param entry The directory entry in context describing the file/directory.
    * @param options Options to pass to the directory reader, file loaders and file readers used during the operation.
    * @returns A promise to a plain JavaScript object representing the directory contents.
    */
-  loadObjectFromDirectory(
-    path: URL,
-    options?: Readonly<DirectoryObjectLoaderOptions>,
-  ): Promise<Record<string, unknown>>;
+  loadValue(
+    entry: DirectoryEntryInContext,
+    options?: Readonly<ValueLoaderOptions>,
+  ): Promise<TValue>;
+}
+
+export interface FluentLoader<TValue> extends ValueLoader<TValue> {
+}
+
+export interface FileLoaderBuildOptions {
+  extension?: string;
+  name?: string;
+}
+
+/**
+ * The signature expected of string parser functions passed to the {@linkcode LoaderBuilder.customFile} method.
+ */
+export type StringParserFunc = (input: string) => unknown;
+
+export type CanLoadValueFunc = (
+  entry: DirectoryEntryInContext,
+) => boolean | Promise<boolean>;
+
+export interface CustomFileLoaderBuildOptions extends FileLoaderBuildOptions {
+  parser: StringParserFunc;
+  canLoadValue?: CanLoadValueFunc;
+}
+
+export interface DirectoryLoaderBuildOptions {
+  name?: string;
+  loaders: Iterable<ValueLoader<unknown>>;
+  defaultOptions?: Readonly<ValueLoaderOptions>;
+}
+
+export interface LoaderBuilder {
+  textFile(options?: Readonly<FileLoaderBuildOptions>): FluentLoader<string>;
+  binaryFile(
+    options?: Readonly<FileLoaderBuildOptions>,
+  ): FluentLoader<Uint8Array>;
+  jsonFile(options?: Readonly<FileLoaderBuildOptions>): FluentLoader<unknown>;
+  customFile(
+    options?: Readonly<CustomFileLoaderBuildOptions>,
+  ): FluentLoader<unknown>;
+  directoryAsObject(
+    options: DirectoryLoaderBuildOptions,
+  ): FluentLoader<Record<string, unknown>>;
+  directoryAsArray(
+    options: DirectoryLoaderBuildOptions,
+  ): FluentLoader<unknown[]>;
+  defaults(): FluentLoader<unknown>[];
 }

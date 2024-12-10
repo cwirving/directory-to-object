@@ -1,208 +1,192 @@
+import { assertEquals, assertExists } from "@std/assert";
 import { test } from "@cross/test";
 import type {
-  DirectoryContentsReader,
-  DirectoryContentsReaderOptions,
-  DirectoryEntry,
-  FileValueLoader,
-  FileValueLoaderOptions,
+  DirectoryEntryInContext,
+  ValueLoader,
+  ValueLoaderOptions,
 } from "./interfaces.ts";
-import {
-  isRecord,
-  loadObjectFromDirectoryEx,
-  loadValueFromFile,
-  validateLoaders,
-} from "./directory_loader.ts";
-import { assertEquals, assertThrows, fail } from "@std/assert";
+import { MockValueLoader } from "./mocks/value_loader.mock.ts";
+import { DirectoryValueLoader } from "./directory_loader.ts";
+import { MockDirectoryContentsReader } from "./mocks/directory_contents_reader.mock.ts";
 
-const neverCalledFileValueLoader: FileValueLoader = {
-  name: "no-op",
-  loadValueFromFile: function (
-    _path: URL,
-    _options?: FileValueLoaderOptions,
+const neverCalledValueLoader: ValueLoader<unknown> = {
+  name: "never called",
+  canLoadValue: function (
+    _entry: DirectoryEntryInContext,
+  ): boolean | Promise<boolean> {
+    throw new Error("Function not implemented.");
+  },
+  computeKey: function (_entry: DirectoryEntryInContext): string | undefined {
+    throw new Error("Function not implemented.");
+  },
+  loadValue: function (
+    _entry: DirectoryEntryInContext,
+    _options?: Readonly<ValueLoaderOptions>,
   ): Promise<unknown> {
     throw new Error("Function not implemented.");
   },
 };
 
-class MockFileValueLoader implements FileValueLoader {
-  readonly name: string;
-  readonly contents: Record<string, unknown>;
-  callCount = 0;
-  lastPath: URL | undefined;
-  lastOptions: FileValueLoaderOptions | undefined;
-
-  constructor(name: string, contents: Record<string, unknown>) {
-    this.name = name;
-    this.contents = contents;
-  }
-
-  loadValueFromFile(
-    path: URL,
-    options?: FileValueLoaderOptions,
-  ): Promise<unknown> {
-    this.lastPath = path;
-    this.lastOptions = options;
-    this.callCount += 1;
-
-    const result = this.contents[path.href];
-    if (!result) {
-      throw new Error(`Unknown URL in mock file value loader: "${path.href}"`);
-    }
-
-    return Promise.resolve(result);
-  }
-}
-
-class MockDirectoryContentsReader implements DirectoryContentsReader {
-  readonly name: string;
-  readonly contents: Record<string, DirectoryEntry[]>;
-
-  constructor(name: string, contents: Record<string, DirectoryEntry[]>) {
-    this.name = name;
-    this.contents = contents;
-  }
-
-  loadDirectoryContents(
-    path: URL,
-    _options?: DirectoryContentsReaderOptions,
-  ): Promise<DirectoryEntry[]> {
-    const result = this.contents[path.href];
-    if (!result) {
-      throw new Error(
-        `Unknown URL in mock directory contents reader: "${path.href}"`,
-      );
-    }
-
-    return Promise.resolve(result);
-  }
-}
-
-test("validateLoaders", () => {
-  // An empty array should be OK.
-  validateLoaders([]);
-
-  // Some good examples
-  validateLoaders([
-    [".a", neverCalledFileValueLoader],
-    [".abc", neverCalledFileValueLoader],
-    [".a.b.c", neverCalledFileValueLoader],
-  ]);
-
-  // Known-bad examples
-  assertThrows(() => {
-    validateLoaders([["", neverCalledFileValueLoader]]);
+test("Directory loader honors loader iteration order", async () => {
+  const loader1 = new MockValueLoader("loader 1", {
+    contents: { "file:///foo.c": 1 },
+    canLoadValue: (entry) => entry.name.endsWith(".c"),
   });
-  assertThrows(() => {
-    validateLoaders([["a", neverCalledFileValueLoader]]);
+  const loader2 = new MockValueLoader("loader 2", {
+    contents: { "file:///foo.b.c": 2 },
+    canLoadValue: (entry) => entry.name.endsWith(".b.c"),
   });
-  assertThrows(() => {
-    validateLoaders([[".a.", neverCalledFileValueLoader]]);
+  const loader3 = new MockValueLoader("loader 3", {
+    contents: {
+      "file:///foo.a.b.c": 3,
+    },
+    canLoadValue: (entry) => entry.url.pathname.endsWith(".a.b.c"),
   });
-  assertThrows(() => {
-    validateLoaders([["abc", neverCalledFileValueLoader]]);
-  });
-  assertThrows(() => {
-    validateLoaders([[".a b", neverCalledFileValueLoader]]);
-  });
-  assertThrows(() => {
-    validateLoaders([[".a .b", neverCalledFileValueLoader]]);
-  });
-});
-
-test("isRecord", () => {
-  assertEquals(isRecord(undefined), false);
-  assertEquals(isRecord(null), false);
-  assertEquals(isRecord(123), false);
-  assertEquals(isRecord("abc"), false);
-  assertEquals(isRecord(["abc", "def"]), false);
-  assertEquals(isRecord({}), true);
-  assertEquals(isRecord({ abc: "def" }), true);
-  assertEquals(isRecord(new URL("http://xyz.zyx")), false);
-
-  class Something {
-    a = 123;
-    b = 456;
-  }
-  assertEquals(isRecord(new Something()), false);
-});
-
-test("loadValueFromFile honors loader iteration order", async () => {
-  const loader1 = new MockFileValueLoader("loader 1", { "file:///foo.c": 1 });
-  const loader2 = new MockFileValueLoader("loader 2", { "file:///foo.b.c": 2 });
-  const loader3 = new MockFileValueLoader("loader 3", {
-    "file:///foo.a.b.c": 3,
-  });
-
-  const loaders: [string, FileValueLoader][] = [
-    [".a.b.c", loader3],
-    [".b.c", loader2],
-    [".c", loader1],
-  ];
-
-  const abortController = new AbortController();
-  const url1 = new URL("file:///foo.c");
-  const options1 = { signal: abortController.signal };
-  const returned1 = await loadValueFromFile("foo.c", url1, loaders, options1);
-  if (returned1 === undefined) fail("loadValueFromFile() should return a pair");
-  const [key1, value1] = returned1;
-  assertEquals(key1, "foo");
-  assertEquals(value1, 1);
-  assertEquals(loader1.callCount, 1);
-  assertEquals(loader2.callCount, 0);
-  assertEquals(loader3.callCount, 0);
-  assertEquals(loader1.lastPath, url1);
-  assertEquals(loader1.lastOptions, options1);
-
-  const url2 = new URL("file:///foo.b.c");
-  const options2 = {};
-  const returned2 = await loadValueFromFile("foo.b.c", url2, loaders, options2);
-  if (returned2 === undefined) fail("loadValueFromFile() should return a pair");
-  const [key2, value2] = returned2;
-  assertEquals(key2, "foo");
-  assertEquals(value2, 2);
-  assertEquals(loader1.callCount, 1);
-  assertEquals(loader2.callCount, 1);
-  assertEquals(loader3.callCount, 0);
-  assertEquals(loader2.lastPath, url2);
-  assertEquals(loader2.lastOptions, options2);
-
-  const url3 = new URL("file:///foo.a.b.c");
-  const returned3 = await loadValueFromFile("foo.a.b.c", url3, loaders);
-  if (returned3 === undefined) fail("loadValueFromFile() should return a pair");
-  const [key3, value3] = returned3;
-  assertEquals(key3, "foo");
-  assertEquals(value3, 3);
-  assertEquals(loader1.callCount, 1);
-  assertEquals(loader2.callCount, 1);
-  assertEquals(loader3.callCount, 1);
-  assertEquals(loader3.lastPath, url3);
-  assertEquals(loader3.lastOptions, undefined);
-});
-
-test("loadValueFromFile returns undefined on no match", async () => {
-  const loader1 = new MockFileValueLoader("loader 1", { "file:///foo.c": 1 });
-
-  const loaders: [string, FileValueLoader][] = [
-    [".c", loader1],
-  ];
-
-  assertEquals(
-    await loadValueFromFile("foo.xyz", new URL("file:///foo.xyz"), loaders),
-    undefined,
+  const mockDirectoryContentsReader = new MockDirectoryContentsReader(
+    "reader",
+    {},
   );
+
+  const loaders = [
+    loader3,
+    loader2,
+    loader1,
+    neverCalledValueLoader,
+  ];
+
+  mockDirectoryContentsReader.contents = {
+    "file:///": [{
+      name: "foo.c",
+      type: "file",
+      url: new URL("file:///foo.c"),
+    }],
+  };
+  const dv1 = new DirectoryValueLoader(
+    "directory loader",
+    loaders,
+    mockDirectoryContentsReader,
+  );
+  const abortController = new AbortController();
+  const entry1: DirectoryEntryInContext = {
+    name: "",
+    relativePath: "",
+    url: new URL("file:///"),
+    type: "directory",
+  };
+  const options1 = { signal: abortController.signal };
+  const returned1 = await dv1.loadValue(entry1, options1);
+  assertExists(returned1);
+
+  assertEquals(returned1["foo.c"], 1);
+  assertEquals(loader1.calls.canLoadValue.length, 1);
+  assertEquals(loader2.calls.canLoadValue.length, 1);
+  assertEquals(loader3.calls.canLoadValue.length, 1);
+  assertEquals(loader1.calls.computeKey.length, 1);
+  assertEquals(loader2.calls.computeKey.length, 0);
+  assertEquals(loader3.calls.computeKey.length, 0);
+  assertEquals(loader1.calls.loadValue.length, 1);
+  assertEquals(loader2.calls.loadValue.length, 0);
+  assertEquals(loader3.calls.loadValue.length, 0);
+
+  assertEquals(loader1.calls.canLoadValue[0].entry.name, "foo.c");
+  assertEquals(loader1.calls.canLoadValue[0].entry.relativePath, "/foo.c");
+  assertEquals(
+    loader1.calls.canLoadValue[0].entry.url,
+    new URL("file:///foo.c"),
+  );
+  assertEquals(loader1.calls.canLoadValue[0].entry.type, "file");
+
+  assertEquals(loader1.calls.computeKey[0].entry.name, "foo.c");
+
+  assertEquals(loader1.calls.loadValue[0].entry.name, "foo.c");
+  assertEquals(loader1.calls.loadValue[0].options, options1);
+
+  loader1.reset();
+  loader2.reset();
+  loader3.reset();
+  mockDirectoryContentsReader.contents = {
+    "file:///": [{
+      name: "foo.b.c",
+      type: "file",
+      url: new URL("file:///foo.b.c"),
+    }],
+  };
+  const dv2 = new DirectoryValueLoader(
+    "directory loader",
+    loaders,
+    mockDirectoryContentsReader,
+  );
+  const options2 = {};
+  const returned2 = await dv2.loadValue(entry1, options2);
+
+  assertExists(returned1);
+
+  assertEquals(returned2["foo.b.c"], 2);
+  assertEquals(loader1.calls.canLoadValue.length, 0);
+  assertEquals(loader2.calls.canLoadValue.length, 1);
+  assertEquals(loader3.calls.canLoadValue.length, 1);
+  assertEquals(loader1.calls.computeKey.length, 0);
+  assertEquals(loader2.calls.computeKey.length, 1);
+  assertEquals(loader3.calls.computeKey.length, 0);
+  assertEquals(loader1.calls.loadValue.length, 0);
+  assertEquals(loader2.calls.loadValue.length, 1);
+  assertEquals(loader3.calls.loadValue.length, 0);
+
+  assertEquals(loader2.calls.computeKey[0].entry.name, "foo.b.c");
+
+  assertEquals(loader2.calls.loadValue[0].entry.name, "foo.b.c");
+  assertEquals(loader2.calls.loadValue[0].options, options2);
+
+  loader1.reset();
+  loader2.reset();
+  loader3.reset();
+  mockDirectoryContentsReader.contents = {
+    "file:///": [{
+      name: "foo.a.b.c",
+      type: "file",
+      url: new URL("file:///foo.a.b.c"),
+    }],
+  };
+  const dv3 = new DirectoryValueLoader(
+    "directory loader",
+    loaders,
+    mockDirectoryContentsReader,
+  );
+  const options3 = {};
+  const returned3 = await dv3.loadValue(entry1, options2);
+
+  assertExists(returned3);
+
+  assertEquals(returned3["foo.a.b.c"], 3);
+  assertEquals(loader1.calls.canLoadValue.length, 0);
+  assertEquals(loader2.calls.canLoadValue.length, 0);
+  assertEquals(loader3.calls.canLoadValue.length, 1);
+  assertEquals(loader1.calls.computeKey.length, 0);
+  assertEquals(loader2.calls.computeKey.length, 0);
+  assertEquals(loader3.calls.computeKey.length, 1);
+  assertEquals(loader1.calls.loadValue.length, 0);
+  assertEquals(loader2.calls.loadValue.length, 0);
+  assertEquals(loader3.calls.loadValue.length, 1);
+
+  assertEquals(loader3.calls.computeKey[0].entry.name, "foo.a.b.c");
+
+  assertEquals(loader3.calls.loadValue[0].entry.name, "foo.a.b.c");
+  assertEquals(loader3.calls.loadValue[0].options, options3);
 });
 
-test("loadObjectFromDirectoryEx", async () => {
-  const loader = new MockFileValueLoader("loader", {
-    "file:///dir/a.txt": "a",
-    "file:///dir/b.txt": "b",
-    "file:///dir/c/d.txt": "d",
-    "file:///dir/e.json": { f: 42 },
+test("DirectoryValueLoader honors options", async () => {
+  const loader = new MockValueLoader("loader", {
+    contents: {
+      "file:///dir/a.txt": "a",
+      "file:///dir/b.txt": "b",
+      "file:///dir/c/d.txt": "d",
+      "file:///dir/e.json": { f: 42 },
+    },
+    computeKey: (entry: DirectoryEntryInContext) => {
+      const dotIndex = entry.name.indexOf(".");
+      return (dotIndex >= 0) ? entry.name.substring(0, dotIndex) : entry.name;
+    },
   });
-  const loaders: [string, FileValueLoader][] = [[".txt", loader], [
-    ".json",
-    loader,
-  ]];
 
   const reader = new MockDirectoryContentsReader("reader", {
     "file:///dir": [{
@@ -233,12 +217,16 @@ test("loadObjectFromDirectoryEx", async () => {
     }],
   });
 
+  const entry: DirectoryEntryInContext = {
+    name: "",
+    relativePath: "",
+    url: new URL("file:///dir"),
+    type: "directory",
+  };
+
   // Load the object without options
-  const noOptionsResult = await loadObjectFromDirectoryEx(
-    new URL("file:///dir"),
-    loaders,
-    reader,
-  );
+  const dv = new DirectoryValueLoader("dv", [loader], reader);
+  const noOptionsResult = await dv.loadValue(entry);
 
   assertEquals(noOptionsResult, {
     a: "a",
@@ -250,12 +238,9 @@ test("loadObjectFromDirectoryEx", async () => {
   });
 
   // Load the object while embedding directory URLs
-  const embedDirectoryURLResult = await loadObjectFromDirectoryEx(
-    new URL("file:///dir"),
-    loaders,
-    reader,
-    { embedDirectoryUrlAs: "__dir__" },
-  );
+  const embedDirectoryURLResult = await dv.loadValue(entry, {
+    embedDirectoryUrlAs: "__dir__",
+  });
 
   assertEquals(embedDirectoryURLResult, {
     __dir__: new URL("file:///dir"),
@@ -269,12 +254,9 @@ test("loadObjectFromDirectoryEx", async () => {
   });
 
   // Load the object while embedding directory URLs
-  const embedFileURLResult = await loadObjectFromDirectoryEx(
-    new URL("file:///dir"),
-    loaders,
-    reader,
-    { embedFileUrlAs: "__file__" },
-  );
+  const embedFileURLResult = await dv.loadValue(entry, {
+    embedFileUrlAs: "__file__",
+  });
 
   assertEquals(embedFileURLResult, {
     a: "a",

@@ -1,23 +1,25 @@
-import type {
-  DirectoryObjectLoaderOptions,
-  FileValueLoader,
-} from "./interfaces.ts";
+import type { LoaderBuilder, ValueLoaderOptions } from "./interfaces.ts";
 import {
-  newDefaultFileValueLoaders,
-  newDirectoryObjectLoader,
+  DefaultLoaderBuilder,
+  newDirectoryContentsReader,
+  newFileReader,
 } from "./factories.ts";
 
 export type * from "./interfaces.ts";
 export * from "./factories.ts";
 
 /**
- * The file value loaders that will be used by the top-level `loadObjectFromDirectory`
- * function. These default to a set containing just ".json" and ".txt" _local_ file loaders,
- *  but the set can be modified at runtime and changes will apply the next time
- * `loadObjectFromDirectory` is called.
+ * !!!
  */
-export const fileValueLoaders: Map<string, FileValueLoader> =
-  newDefaultFileValueLoaders();
+export const Loaders: LoaderBuilder = new DefaultLoaderBuilder(
+  newFileReader(),
+  newDirectoryContentsReader(),
+);
+
+/**
+ * !!!
+ */
+export const defaultLoaders = Loaders.defaults();
 
 /**
  * Asynchronously load the contents of a directory into a new plain JavaScript object.
@@ -35,9 +37,16 @@ export const fileValueLoaders: Map<string, FileValueLoader> =
  */
 export function loadObjectFromDirectory(
   path: URL,
-  options?: DirectoryObjectLoaderOptions,
+  options?: ValueLoaderOptions,
 ): Promise<Record<string, unknown>> {
-  const directoryObjectLoader = newDirectoryObjectLoader(fileValueLoaders);
+  const directoryObjectLoader = Loaders.directoryAsObject({
+    loaders: defaultLoaders,
+  });
 
-  return directoryObjectLoader.loadObjectFromDirectory(path, options);
+  return directoryObjectLoader.loadValue({
+    relativePath: "",
+    name: "",
+    type: "directory",
+    url: path,
+  }, options);
 }

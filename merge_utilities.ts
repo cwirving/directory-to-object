@@ -1,5 +1,6 @@
-import type { DirectoryObjectLoaderOptions } from "./interfaces.ts";
-import { isRecord } from "./directory_loader.ts";
+import type { ValueLoaderOptions } from "./interfaces.ts";
+
+import { isRecord } from "./is_record.ts";
 
 /**
  * A helper function to merge default and explicit options.
@@ -61,7 +62,7 @@ export function setOrMergeValue(
   target: Record<string, unknown>,
   key: string,
   value: unknown,
-  options?: DirectoryObjectLoaderOptions,
+  options?: ValueLoaderOptions,
 ): void {
   if (typeof value === "object") {
     const targetValue = target[key];

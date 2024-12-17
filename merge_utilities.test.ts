@@ -1,7 +1,7 @@
 import { test } from "@cross/test";
 import { assertEquals } from "@std/assert";
 import { setOrMergeValue } from "./merge_utilities.ts";
-import type { DirectoryObjectLoaderOptions } from "./interfaces.ts";
+import type { ValueLoaderOptions } from "./interfaces.ts";
 import { merge, union } from "@es-toolkit/es-toolkit";
 
 test("setOrMergeValue plain overwrite cases", () => {
@@ -40,7 +40,7 @@ test("setOrMergeValue merge cases from es-toolkit documentation", () => {
   let target: Record<string, unknown> = { data: { a: 1, b: { x: 1, y: 2 } } };
   let source: Record<string, unknown> = { b: { y: 3, z: 4 }, c: 5 };
   // Using the es-toolkit merge function, so that the results match.
-  const options: DirectoryObjectLoaderOptions = {
+  const options: ValueLoaderOptions = {
     objectMergeFunction: merge,
   };
   setOrMergeValue(target, "data", source, options);
@@ -68,7 +68,7 @@ test("setOrMergeValue merges/overwrites arrays", () => {
   // Using the es-toolkit merge function
   target = { data: [1, 2, 3] };
   source = [4, 5, 6];
-  const options: DirectoryObjectLoaderOptions = {
+  const options: ValueLoaderOptions = {
     arrayMergeFunction: union,
   };
   setOrMergeValue(target, "data", source, options);

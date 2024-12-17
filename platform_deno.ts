@@ -33,21 +33,21 @@ async function dirEntryToType(
     : "other";
 }
 
-function denoLoadTextFromFile(
+function denoReadTextFromFile(
   path: URL,
   options?: ReadTextFromFileOptions,
 ): Promise<string> {
   return Deno.readTextFile(path, options);
 }
 
-function denoLoadBinaryFromFile(
+function denoReadBinaryFromFile(
   path: URL,
   options?: ReadBinaryFromFileOptions,
 ): Promise<Uint8Array> {
   return Deno.readFile(path, options);
 }
 
-async function denoLoadDirectoryContents(
+async function denoReadDirectoryContents(
   path: URL,
   options?: DirectoryContentsReaderOptions,
 ): Promise<DirectoryEntry[]> {
@@ -72,12 +72,12 @@ export function makeDenoPlatform(): Platform {
   return Object.freeze({
     fileReader: {
       name: "Deno file reader",
-      readTextFromFile: denoLoadTextFromFile,
-      readBinaryFromFile: denoLoadBinaryFromFile,
+      readTextFromFile: denoReadTextFromFile,
+      readBinaryFromFile: denoReadBinaryFromFile,
     },
     directoryContentsReader: {
       name: "Deno directory reader",
-      loadDirectoryContents: denoLoadDirectoryContents,
+      readDirectoryContents: denoReadDirectoryContents,
     },
   });
 }

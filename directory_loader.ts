@@ -1,150 +1,312 @@
 import type {
   DirectoryContentsReader,
-  DirectoryObjectLoaderOptions,
-  FileValueLoader,
-  FileValueLoaderOptions,
+  DirectoryEntryInContext,
+  ValueLoader,
+  ValueLoaderOptions,
 } from "./interfaces.ts";
-import { setOrMergeValue } from "./merge_utilities.ts";
+import { mergeOptions, setOrMergeValue } from "./merge_utilities.ts";
+import { isRecord } from "./is_record.ts";
+import { numberAwareComparison, parseInt } from "./number_aware_comparison.ts";
+import { ensureIsDefined } from "./ensure_is_defined.ts";
 
 /**
- * This regular expression is what we consider to be a valid file extension.
+ * This is the shape of the data we'll combine with the directory entries we get from the directory reader in order
+ * to call the loaders in context and do the bookkeeping needed to sort entries before loading.
  */
-const _validExtensionRegex = /^(\.\w+)+$/;
+interface DirectoryEntryWithLoadingDecision extends DirectoryEntryInContext {
+  /**
+   * The loader that will be used for this entry.
+   */
+  loader: ValueLoader<unknown>;
 
-/**
- * Make sure that the file value loaders are valid (have valid file name extensions).
- *
- * @param loaders
- */
-export function validateLoaders(
-  loaders: Iterable<Readonly<[string, FileValueLoader]>>,
-): void {
-  for (const [key, _value] of loaders) {
-    if (_validExtensionRegex.exec(key) === null) {
-      throw new Error(`"${key}" is not a valid file extension`);
-    }
-  }
+  /**
+   * The key that the loader computed for this entry.
+   */
+  key: string | undefined;
+
+  /**
+   * The key, after decoding. This is what we'll sort entries by and use as the key for storing the loaded value
+   * in the resulting object/array.
+   */
+  decodedKey: string | undefined;
 }
 
 /**
- * Check that a value is a plain JavaScript object (i.e., not a class instance).
+ * DirectoryValueLoader is the abstract class responsible for loading the values from directory entries into objects
+ * or arrays. The {@linkcode DirectoryObjectValueLoader} and {@linkcode DirectoryArrayValueLoader} specializations
+ * control whether the value type is an object or array.
  *
- * @param candidate The value to introspect.
+ * It implements the ValueLoader interface and can load directory entries of type "directory".
  */
-export function isRecord(
-  candidate: unknown,
-): candidate is Record<string, unknown> {
-  if (
-    typeof candidate === "object" && candidate !== null &&
-    !Array.isArray(candidate)
+abstract class DirectoryValueLoader
+  implements ValueLoader<Record<string, unknown> | unknown[]> {
+  readonly name: string;
+  readonly #loaders: ValueLoader<unknown>[];
+  readonly #directoryReader: DirectoryContentsReader;
+  readonly #defaultOptions: Readonly<ValueLoaderOptions> | undefined;
+
+  protected constructor(
+    name: string,
+    loaders: Iterable<ValueLoader<unknown>>,
+    directoryReader: DirectoryContentsReader,
+    defaultOptions?: Readonly<ValueLoaderOptions>,
   ) {
-    const proto = Object.getPrototypeOf(candidate);
-    return proto === null || proto === Object.prototype;
+    this.name = name;
+    const clonedLoaders = Array.from(loaders);
+    clonedLoaders.push(this);
+    this.#loaders = clonedLoaders;
+    this.#directoryReader = directoryReader;
+    this.#defaultOptions = defaultOptions;
   }
 
-  return false;
-}
+  /**
+   * Abstract method to generate a new empty result, which can either be a record with string keys and unknown values or
+   * an array of unknown elements, depending on the subclass.
+   *
+   * @return Returns a newly created empty result, represented as either a record object or an array.
+   */
+  abstract newEmptyResult(): Record<string, unknown> | unknown[];
 
-/**
- * Load the value of a file, using the file value loaders specified. The loaders are
- * examined in iteration order to determine which will be used: the first loader that
- * (case-sensitively) matches the file name extension will be used with no fallback.
- *
- * @param name The name of the file, including extension.
- * @param path The URL of the file. I.e., `file:` URL for local files.
- * @param loaders The file value loaders to consider for the file.
- * @param options Options to pass to the file value loader used.
- * @returns The value of the loaded file (could be any valid JavaScript data type) or `undefined` if there was no file value loader for the extension.
- */
-export async function loadValueFromFile(
-  name: string,
-  path: URL,
-  loaders: Iterable<Readonly<[string, FileValueLoader]>>,
-  options?: FileValueLoaderOptions,
-): Promise<[string, unknown] | undefined> {
-  for (const [extension, fileLoader] of loaders) {
-    if (name.endsWith(extension)) {
-      const key = name.substring(0, name.length - extension.length);
-      const value = await fileLoader.loadValueFromFile(path, options);
-      return [key, value];
+  /**
+   * We only can load directories.
+   *
+   * @param entry The directory entry to examine.
+   * @returns `true` if the entry is of type "directory".
+   */
+  canLoadValue(entry: DirectoryEntryInContext): boolean | Promise<boolean> {
+    return entry.type === "directory";
+  }
+
+  /**
+   * Determines the key for the provided directory entry -- since we only handle directories, it is the directory name.
+   *
+   * @param entry - The directory entry from which the key will be computed.
+   * @returns The name of the directory.
+   */
+  computeKey(entry: DirectoryEntryInContext): string | undefined {
+    return entry.name;
+  }
+
+  /**
+   * Loads the value of a directory entry and returns it as a plain JavaScript object.
+   *
+   * @param entry The directory entry to load. Must be of type "directory".
+   * @param options Optional configuration parameters for the value loader.
+   * @returns A promise that resolves to a plain JavaScript object containing the loaded values.
+   * @throws {TypeError} If the entry is not a directory.
+   * @throws {Error} If in strict mode and an entry cannot be loaded.
+   */
+  async loadValue(
+    entry: DirectoryEntryInContext,
+    options?: Readonly<ValueLoaderOptions>,
+  ): Promise<Record<string, unknown> | unknown[]> {
+    if (entry.type !== "directory") {
+      throw new TypeError(
+        `Directory value loader attempting to load a non-directory from "${entry.url.href}"`,
+      );
     }
-  }
 
-  // We don't want to throw an exception here because this is not an error.
-  // We'll be scanning directories will all sorts of other junk in them in addition
-  // to the files intended to be loaded, so throwing here would just be painful.
-  return undefined;
-}
+    const mergedOptions = mergeOptions(this.#defaultOptions, options);
+    mergedOptions?.signal?.throwIfAborted();
 
-/**
- * Generic implementation of a directory to object loader. Loads the contents of a directory
- * as a plain JavaScript object, using the {@linkcode loadValueFromFile} function to load
- * the values of files in the directory into properties named like the extension-less file name.
- *
- * The difference between this and the module-level `loadObjectFromDirectory` function is
- * that is the inner, fully-parameterized, version of the function. The module-level function
- * is a convenience, this is the inner plumbing.
- *
- * The naming is a wink to the Microsoft convention of old where Windows APIs had basic versions
- * and "Ex" versions with more parameters.
- *
- * @param path The URL of the directory to load. I.e., `file:` URL for local directories.
- * @param loaders The file value loaders to consider when loading directory contents.
- * @param directoryReader The directory reader implementation to use to read the directory listing.
- * @param options Options to pass to the directory reader and file value loaders as they are called.
- */
-export async function loadObjectFromDirectoryEx(
-  path: URL,
-  loaders: Iterable<Readonly<[string, FileValueLoader]>>,
-  directoryReader: DirectoryContentsReader,
-  options?: DirectoryObjectLoaderOptions,
-): Promise<Record<string, unknown>> {
-  const result: Record<string, unknown> = {};
-  const contents = await directoryReader.loadDirectoryContents(path, options);
-  const propertyNameDecoder = options?.propertyNameDecoder ?? ((name) => name);
+    const result = this.newEmptyResult();
+    const contents = await this.#directoryReader.readDirectoryContents(
+      entry.url,
+      options,
+    ) as DirectoryEntryWithLoadingDecision[];
 
-  for (const entry of contents) {
-    switch (entry.type) {
-      case "file": {
-        const loaded = await loadValueFromFile(
-          entry.name,
-          entry.url,
-          loaders,
-          options,
-        );
-        if (loaded !== undefined) {
-          const [key, value] = loaded;
+    const propertyNameDecoder = mergedOptions?.propertyNameDecoder ??
+      ((name) => name);
 
-          // If the caller has requested that we embed file URLs, do it:
-          if (isRecord(value) && typeof options?.embedFileUrlAs === "string") {
-            value[options.embedFileUrlAs] = entry.url;
-          }
+    // Step 1: look at all the directory entries and decide which loader can handle them, what their resulting key
+    // will be, etc. But DO NOT load them yet.
+    for (const directoryEntry of contents) {
+      directoryEntry.relativePath =
+        `${entry.relativePath}/${directoryEntry.name}`;
+      let loaded = false;
 
-          setOrMergeValue(result, propertyNameDecoder(key), value, options);
+      for (const loader of this.#loaders) {
+        const canLoadEntryMaybePromise = loader.canLoadValue(directoryEntry);
+        if (
+          (canLoadEntryMaybePromise instanceof Promise)
+            ? await canLoadEntryMaybePromise
+            : canLoadEntryMaybePromise
+        ) {
+          directoryEntry.loader = loader;
+          const key = loader.computeKey(directoryEntry);
+          directoryEntry.key = key;
+          directoryEntry.decodedKey = (key !== undefined)
+            ? propertyNameDecoder(key)
+            : undefined;
+          loaded = true;
+          break;
         }
-        break;
       }
-      case "directory":
-        setOrMergeValue(
-          result,
-          propertyNameDecoder(entry.name),
-          await loadObjectFromDirectoryEx(
-            entry.url,
-            loaders,
-            directoryReader,
-            options,
-          ),
+
+      if (mergedOptions?.strict && !loaded) {
+        throw new Error(
+          `Directory entry at "${directoryEntry.url}" cannot be loaded`,
         );
-        break;
-      default:
-        break;
+      }
+    }
+
+    // Step 2: sort the directory entries by decoded key.
+    contents.sort((a, b) => numberAwareComparison(a.decodedKey, b.decodedKey));
+
+    // Step 3: Load the entries in order.
+    let index = 0;
+    for (const directoryEntry of contents) {
+      if (directoryEntry.key !== undefined) {
+        const value = await directoryEntry.loader.loadValue(
+          directoryEntry,
+          mergedOptions,
+        );
+        const decodedKey = ensureIsDefined(directoryEntry.decodedKey);
+
+        // If the caller has requested that we embed file URLs, do it:
+        if (
+          directoryEntry.type === "file" && isRecord(value) &&
+          typeof mergedOptions?.embedFileUrlAs === "string"
+        ) {
+          value[mergedOptions.embedFileUrlAs] = directoryEntry.url;
+        }
+
+        // Set the value, with variations depending on this being an array or object.
+        index = this.setValue(result, decodedKey, index, value, mergedOptions);
+
+        ++index;
+      }
+    }
+
+    // If the caller has requested that we embed directory URLs, do it:
+    this.embedDirectoryUrl(result, entry, options);
+
+    return result;
+  }
+
+  protected abstract embedDirectoryUrl(
+    result: Record<string, unknown> | unknown[],
+    entry: DirectoryEntryInContext,
+    options?: Readonly<ValueLoaderOptions>,
+  ): void;
+
+  protected abstract setValue(
+    result: Record<string, unknown> | unknown[],
+    decodedKey: string,
+    index: number,
+    value: unknown,
+    mergedOptions?: Readonly<ValueLoaderOptions>,
+  ): number;
+}
+
+export class DirectoryObjectValueLoader extends DirectoryValueLoader
+  implements ValueLoader<Record<string, unknown>> {
+  /**
+   * Constructs a `DirectoryObjectValueLoader` instance. This is the loader for directories as _objects_, built using the
+   * general implementation in class {@linkcode DirectoryValueLoader}.
+   *
+   * @param name The name of the loader.
+   * @param loaders An iterable collection of value loaders used to handle directory entries.
+   * @param directoryReader The directory contents reader responsible for reading the directory contents.
+   * @param defaultOptions Optional default options for the loader.
+   */
+  constructor(
+    name: string,
+    loaders: Iterable<ValueLoader<unknown>>,
+    directoryReader: DirectoryContentsReader,
+    defaultOptions?: Readonly<ValueLoaderOptions>,
+  ) {
+    super(name, loaders, directoryReader, defaultOptions);
+  }
+
+  newEmptyResult(): Record<string, unknown> {
+    return {};
+  }
+
+  override loadValue(
+    entry: DirectoryEntryInContext,
+    options?: Readonly<ValueLoaderOptions>,
+  ): Promise<Record<string, unknown>> {
+    return super.loadValue(entry, options) as Promise<Record<string, unknown>>;
+  }
+
+  protected override embedDirectoryUrl(
+    result: Record<string, unknown>,
+    entry: DirectoryEntryInContext,
+    options?: Readonly<ValueLoaderOptions>,
+  ): void {
+    if (typeof options?.embedDirectoryUrlAs === "string") {
+      result[options.embedDirectoryUrlAs] = entry.url;
     }
   }
 
-  // If the caller has requested that we embed directory URLs, do it:
-  if (typeof options?.embedDirectoryUrlAs === "string") {
-    result[options.embedDirectoryUrlAs] = path;
+  protected override setValue(
+    result: Record<string, unknown>,
+    decodedKey: string,
+    index: number,
+    value: unknown,
+    mergedOptions?: Readonly<ValueLoaderOptions>,
+  ): number {
+    setOrMergeValue(
+      result,
+      decodedKey,
+      value,
+      mergedOptions,
+    );
+    return index;
+  }
+}
+
+export class DirectoryArrayValueLoader extends DirectoryValueLoader
+  implements ValueLoader<unknown[]> {
+  /**
+   * Constructs a `DirectoryArrayValueLoader` instance. This is the loader for directories as _arrays_, built using the
+   * general implementation in class {@linkcode DirectoryValueLoader}.
+   *
+   * @param name The name of the loader.
+   * @param loaders An iterable collection of value loaders used to handle directory entries.
+   * @param directoryReader The directory contents reader responsible for reading the directory contents.
+   * @param defaultOptions Optional default options for the loader.
+   */
+  constructor(
+    name: string,
+    loaders: Iterable<ValueLoader<unknown>>,
+    directoryReader: DirectoryContentsReader,
+    defaultOptions?: Readonly<ValueLoaderOptions>,
+  ) {
+    super(name, loaders, directoryReader, defaultOptions);
   }
 
-  return result;
+  newEmptyResult(): unknown[] {
+    return [];
+  }
+
+  override loadValue(
+    entry: DirectoryEntryInContext,
+    options?: Readonly<ValueLoaderOptions>,
+  ): Promise<unknown[]> {
+    return super.loadValue(entry, options) as Promise<unknown[]>;
+  }
+
+  protected override embedDirectoryUrl(
+    _result: unknown[],
+    _entry: DirectoryEntryInContext,
+    _options?: Readonly<ValueLoaderOptions>,
+  ): void {}
+
+  protected override setValue(
+    result: unknown[],
+    decodedKey: string,
+    index: number,
+    value: unknown,
+    _mergedOptions?: Readonly<ValueLoaderOptions>,
+  ): number {
+    const maybeNameAsIndex = parseInt(decodedKey);
+    if (maybeNameAsIndex == maybeNameAsIndex) {
+      index = maybeNameAsIndex;
+    }
+    result[index] = value;
+
+    return index;
+  }
 }

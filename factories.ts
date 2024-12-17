@@ -1,17 +1,37 @@
+/**
+ * The functions in this module are the lower-level implementation details of the public API. They allow advanced
+ * consumers to control precisely how the library interacts with the file system or provide their own file system-like
+ * implementations.
+ *
+ * The {@linkcode newFileReader} function is a platform-neutral way of creating the file reading abstraction used
+ * throughout this library.
+ *
+ * The {@linkcode newDirectoryContentsReader} function is a platform-neutral way of creating the directory contents
+ * reader abstraction used throughout this library.
+ *
+ * The {@linkcode DefaultLoaderBuilder} is the default implementation of the {@linkcode LoaderBuilder} interface.
+ * It is initialized with {@linkcode FileReader} and {@linkcode DirectoryContentsReader}
+ * implementations. It is used to build all the loaders known to the library in a fluent way.
+ *
+ * @module
+ */
 import type {
+  CustomFileLoaderBuildOptions,
   DirectoryContentsReader,
-  DirectoryObjectLoader,
-  DirectoryObjectLoaderOptions,
+  DirectoryEntryInContext,
+  DirectoryLoaderBuildOptions,
+  FileLoaderBuildOptions,
   FileReader,
-  FileValueLoader,
-  FileValueLoaderOptions,
+  FluentLoader,
+  LoaderBuilder,
+  ValueLoaderOptions,
 } from "./interfaces.ts";
-import {
-  loadObjectFromDirectoryEx,
-  validateLoaders,
-} from "./directory_loader.ts";
 import { platform } from "./platform.ts";
-import { mergeOptions } from "./merge_utilities.ts";
+import { makeFluent } from "./fluent_loader.ts";
+import {
+  DirectoryArrayValueLoader,
+  DirectoryObjectValueLoader,
+} from "./directory_loader.ts";
 
 /**
  * Create a new file reader appropriate for reading local files on the current platform.
@@ -34,155 +54,154 @@ export function newDirectoryContentsReader(): DirectoryContentsReader {
 }
 
 /**
- * Create a new loader for plain text files, using the provided file text reader.
- *
- * @param textReader The file text reader to perform the physical file reading.
- * @returns An object implementing the {@link FileValueLoader} interface that performs plain text file loading into string values.
+ * The concrete implementation of the {@linkcode LoaderBuilder} interface exposed by this library.
+ * It creates the file and directory loaders known to the library.
  */
-export function newTextFileValueLoader(
-  textReader: FileReader,
-): FileValueLoader {
-  return Object.freeze({
-    name: "Text file value loader",
-    loadValueFromFile: (
-      path: URL,
-      options?: FileValueLoaderOptions,
-    ) => {
-      options?.signal?.throwIfAborted();
-      return textReader.readTextFromFile(path, options);
-    },
-  });
-}
+export class DefaultLoaderBuilder implements LoaderBuilder {
+  readonly #fileReader: FileReader;
+  readonly #directoryContentsReader: DirectoryContentsReader;
 
-/**
- * Create a new loader for (opaque) binary files, using the provided binary file loader.
- *
- * @param binaryReader The binary file reader used to perform the physical file reading.
- * @returns An object implementing the {@link FileValueLoader} interface.
- */
-export function newBinaryFileValueLoader(
-  binaryReader: FileReader,
-): FileValueLoader {
-  return Object.freeze({
-    name: "Binary file value loader",
-    loadValueFromFile: (
-      path: URL,
-      options?: FileValueLoaderOptions,
-    ) => {
-      options?.signal?.throwIfAborted();
-      return binaryReader.readBinaryFromFile(path, options);
-    },
-  });
-}
-
-/**
- * The signature expected of string parser functions passed to {@linkcode newStringParserFileValueLoader} function.
- */
-export type StringParserFunc = (input: string) => unknown;
-
-/**
- * Create a new text file loader using an externally-provided parser function.
- *
- * @param textReader The underlying text file reader used to perform the physical file reading.
- * @param parser The string parser function applied to the string loaded by the text file reader.
- * @param name The name to give the resulting file value loader.
- * @returns An object implementing the {@link FileValueLoader} interface.
- */
-export function newStringParserFileValueLoader(
-  textReader: FileReader,
-  parser: StringParserFunc,
-  name: string,
-): FileValueLoader {
-  return Object.freeze({
-    name: name,
-    loadValueFromFile: async (
-      path: URL,
-      options?: FileValueLoaderOptions,
-    ) => {
-      options?.signal?.throwIfAborted();
-      const text = await textReader.readTextFromFile(path, options);
-      return parser(text);
-    },
-  });
-}
-
-/**
- * Create a new JSON file value loader with the provided text file reader.
- *
- * @param textReader The underlying text file reader used to perform physical file reading.
- * @returns An object implementing the {@link FileValueLoader} interface which reads and parses JSON files.
- */
-export function newJsonFileValueLoader(
-  textReader: FileReader,
-): FileValueLoader {
-  return newStringParserFileValueLoader(
-    textReader,
-    JSON.parse,
-    "JSON file value loader",
-  );
-}
-
-/**
- * Create the default file value loaders using built-in types:
- * - A text file value loader for the ".txt" file extension.
- * - A JSON file value loader for the ".json" file extension.
- *
- * This map can be passed to the {@link newDirectoryObjectLoader} function to specify which
- * file extensions will be processed and the corresponding file loader.
- *
- * The function returns a new map each time it is called, so the caller can
- * add additional entries without interfering with other loader maps.
- *
- * @returns A map of file extensions (as strings, including the dot -- e.g., ".txt") to the corresponding {@link FileValueLoader} to use for that extension.
- */
-export function newDefaultFileValueLoaders(): Map<string, FileValueLoader> {
-  const textReader = newFileReader();
-  return new Map<string, FileValueLoader>([
-    [".json", newJsonFileValueLoader(textReader)],
-    [".txt", newTextFileValueLoader(textReader)],
-  ]);
-}
-
-/**
- * Create a new directory object loader, given loader mappings and a directory reader.
- *
- * @param loaders The mappings from file extension to file loader. Note that this can be an ordered array of tuples -- they are checked in order.
- * @param directoryReader The optional directory reader used to determine directory contents. Defaults to a local directory reader.
- * @param name The optional name of the loader.
- * @param defaultOptions Default options that will be used by the directory object loader. Options provided in calls to `loadObjectFromDirectory` will override these defaults. If both defaults and call options are provided, they are merged.
- * @returns An object implementing interface {@link DirectoryContentsReader}.
- */
-export function newDirectoryObjectLoader(
-  loaders: Iterable<Readonly<[string, FileValueLoader]>>,
-  directoryReader?: DirectoryContentsReader,
-  name?: string,
-  defaultOptions?: Readonly<DirectoryObjectLoaderOptions>,
-): DirectoryObjectLoader {
-  if (directoryReader === undefined) {
-    directoryReader = newDirectoryContentsReader();
+  /**
+   * Constructs an instance of the class with its required readers.
+   *
+   * @param fileReader - The object responsible for reading files.
+   * @param directoryContentsReader - the object responsible for reading directory contents.
+   */
+  constructor(
+    fileReader: FileReader,
+    directoryContentsReader: DirectoryContentsReader,
+  ) {
+    this.#fileReader = fileReader;
+    this.#directoryContentsReader = directoryContentsReader;
   }
 
-  // We clone the loader iterable to an array to maintain their order.
-  const clonedLoaders = Array.from(loaders);
-  validateLoaders(clonedLoaders);
+  textFile(options?: Readonly<FileLoaderBuildOptions>): FluentLoader<string> {
+    const name = options?.name ?? "Text file value loader";
+    const extension = options?.extension ?? "";
+    const fileReader = this.#fileReader;
 
-  return Object.freeze({
-    name: name ?? "Generic directory object loader",
-    _defaultOptions: defaultOptions, // Not used. Just present to make code easier to debug.
-    _loaders: loaders, // Not used. Just present to make code easier to debug.
-    loadObjectFromDirectory: async (
-      path: URL,
-      options?: Readonly<DirectoryObjectLoaderOptions>,
-    ) => {
-      const mergedOptions = mergeOptions(defaultOptions, options);
-      mergedOptions?.signal?.throwIfAborted();
+    return makeFluent<string>({
+      name: name,
+      canLoadValue: function (
+        entry: DirectoryEntryInContext,
+      ): boolean | Promise<boolean> {
+        return entry.name.endsWith(extension);
+      },
+      computeKey: function (
+        entry: DirectoryEntryInContext,
+      ): string | undefined {
+        return entry.name.substring(0, entry.name.length - extension.length);
+      },
+      loadValue: function (
+        entry: DirectoryEntryInContext,
+        options?: Readonly<ValueLoaderOptions>,
+      ): Promise<string> {
+        return fileReader.readTextFromFile(entry.url, options);
+      },
+    });
+  }
 
-      return await loadObjectFromDirectoryEx(
-        path,
-        clonedLoaders,
-        directoryReader,
-        mergedOptions,
-      );
-    },
-  });
+  binaryFile(
+    options?: Readonly<FileLoaderBuildOptions>,
+  ): FluentLoader<Uint8Array> {
+    const name = options?.name ?? "Binary file value loader";
+    const extension = options?.extension ?? "";
+    const fileReader = this.#fileReader;
+
+    return makeFluent<Uint8Array>({
+      name: name,
+      canLoadValue: function (
+        entry: DirectoryEntryInContext,
+      ): boolean | Promise<boolean> {
+        return entry.name.endsWith(extension);
+      },
+      computeKey: function (
+        entry: DirectoryEntryInContext,
+      ): string | undefined {
+        return entry.name.substring(0, entry.name.length - extension.length);
+      },
+      loadValue: function (
+        entry: DirectoryEntryInContext,
+        options?: Readonly<ValueLoaderOptions>,
+      ): Promise<Uint8Array> {
+        return fileReader.readBinaryFromFile(entry.url, options);
+      },
+    });
+  }
+
+  jsonFile(options?: Readonly<FileLoaderBuildOptions>): FluentLoader<unknown> {
+    const customOptions =
+      (options
+        ? Object.fromEntries(Object.entries(options))
+        : {}) as FileLoaderBuildOptions as CustomFileLoaderBuildOptions;
+    customOptions.parser = JSON.parse;
+    customOptions.name = options?.name ?? "JSON file value loader";
+    customOptions.extension = options?.extension ?? "";
+    return this.customFile(customOptions);
+  }
+
+  customFile(
+    options: Readonly<CustomFileLoaderBuildOptions>,
+  ): FluentLoader<unknown> {
+    const name = options.name ?? "Custom file value loader";
+    const extension = options.extension ?? "";
+    const fileReader = this.#fileReader;
+    const parser = options.parser;
+    const canLoadValue = options.canLoadValue ??
+      ((entry: DirectoryEntryInContext) => entry.name.endsWith(extension));
+
+    return makeFluent({
+      name: name,
+      canLoadValue: function (
+        entry: DirectoryEntryInContext,
+      ): boolean | Promise<boolean> {
+        return canLoadValue(entry);
+      },
+      computeKey: function (
+        entry: DirectoryEntryInContext,
+      ): string | undefined {
+        return entry.name.substring(0, entry.name.length - extension.length);
+      },
+      loadValue: async function (
+        entry: DirectoryEntryInContext,
+        options?: Readonly<ValueLoaderOptions>,
+      ): Promise<unknown> {
+        const contents = await fileReader.readTextFromFile(entry.url, options);
+        return parser(contents);
+      },
+    });
+  }
+
+  directoryAsObject(
+    options: DirectoryLoaderBuildOptions,
+  ): FluentLoader<Record<string, unknown>> {
+    return makeFluent(
+      new DirectoryObjectValueLoader(
+        options.name ?? "Directory object value loader",
+        options.loaders,
+        this.#directoryContentsReader,
+        options.defaultOptions,
+      ),
+    );
+  }
+
+  directoryAsArray(
+    options: DirectoryLoaderBuildOptions,
+  ): FluentLoader<unknown[]> {
+    return makeFluent(
+      new DirectoryArrayValueLoader(
+        options.name ?? "Directory array value loader",
+        options.loaders,
+        this.#directoryContentsReader,
+        options.defaultOptions,
+      ),
+    );
+  }
+
+  defaults(): FluentLoader<unknown>[] {
+    return [
+      this.textFile().whenExtensionIs(".txt"),
+      this.jsonFile().whenExtensionIs(".json"),
+    ];
+  }
 }

@@ -1,43 +1,66 @@
 import type {
-  DirectoryObjectLoaderOptions,
-  FileValueLoader,
+  FluentLoader,
+  LoaderBuilder,
+  ValueLoaderOptions,
 } from "./interfaces.ts";
 import {
-  newDefaultFileValueLoaders,
-  newDirectoryObjectLoader,
+  DefaultLoaderBuilder,
+  newDirectoryContentsReader,
+  newFileReader,
 } from "./factories.ts";
 
-export type * from "./interfaces.ts";
-export * from "./factories.ts";
+/**
+ * The loader builder to create any of the built-in loaders and customize them to your needs. See the
+ * {@linkcode LoaderBuilder} interface for more details.
+ */
+export const Loaders: LoaderBuilder = new DefaultLoaderBuilder(
+  newFileReader(),
+  newDirectoryContentsReader(),
+);
 
 /**
- * The file value loaders that will be used by the top-level `loadObjectFromDirectory`
- * function. These default to a set containing just ".json" and ".txt" _local_ file loaders,
- *  but the set can be modified at runtime and changes will apply the next time
- * `loadObjectFromDirectory` is called.
+ * The loaders that the {@linkcode loadObjectFromDirectory} function will use to initialize its loader.
+ * This array is mutable for customization.
+ *
+ * For example, to add a YAML parser to the default loaders:
+ *
+ * ```typescript
+ * import * as YAML from "@std/yaml";
+ *
+ * // Create a YAML file loader
+ * const yamlLoader = Loaders.customFile({
+ *   extension: ".yaml",
+ *   name: "YAML file value loader",
+ *   parser: YAML.parse,
+ * });
+ *
+ * // Add it to the default loaders
+ * defaultLoaders.push(yamlLoader);
+ *
+ * // From now on, calls to loadObjectFromDirectory() will know to parse
+ * // files with a ".yaml" extension as YAML...
+ * ```
  */
-export const fileValueLoaders: Map<string, FileValueLoader> =
-  newDefaultFileValueLoaders();
+export const defaultLoaders: FluentLoader<unknown>[] = Loaders.defaults();
 
 /**
  * Asynchronously load the contents of a directory into a new plain JavaScript object.
  * This will retrieve a listing of the directory, iterate over each file/directory listed
  * and load those that have file value loaders registered.
  *
- * **Note:** The file value loaders defined in the `fileValueLoaders` variable are applied in an
- * unspecified order, so this convenience function should only be used in the (most common) case
- * where there are no conflicting loaders. If you need to control the loader priority
- * order, construct your own file value loaders in an array of tuples and construct a directory
- * object loader directly using the `newDirectoryObjectLoader` factory function/
+ * **Note:** The file value loaders defined in the `defaultLoaders` variable are queried in array order,
+ * so consumers that care about loader precedence should make sure to sort the array appropriately.
  *
- * @param path The URL of the directory to load. For local directories, this should be a `file:` URL.
+ * @param directoryUrl The URL of the directory to load. For local directories, this should be a `file:` URL.
  * @param options Options governing the loading of directory and file data, including an optional `AbortSignal`.
  */
 export function loadObjectFromDirectory(
-  path: URL,
-  options?: DirectoryObjectLoaderOptions,
+  directoryUrl: URL,
+  options?: ValueLoaderOptions,
 ): Promise<Record<string, unknown>> {
-  const directoryObjectLoader = newDirectoryObjectLoader(fileValueLoaders);
+  const directoryObjectLoader = Loaders.directoryAsObject({
+    loaders: defaultLoaders,
+  });
 
-  return directoryObjectLoader.loadObjectFromDirectory(path, options);
+  return directoryObjectLoader.loadDirectory(directoryUrl, options);
 }

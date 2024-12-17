@@ -39,17 +39,22 @@ async function direntToType(
     : "other";
 }
 
-function nodeLoadTextFromFile(
+function nodeReadTextFromFile(
   path: URL,
   options?: ReadTextFromFileOptions,
 ): Promise<string> {
+  // We need to do this because Bun seems not to reliably honor the "signal" option.
+  if (options?.signal?.aborted) {
+    return Promise.reject(options.signal.reason);
+  }
+
   return fsPromises.readFile(path, {
     encoding: "utf-8",
     signal: (options as Abortable | undefined)?.signal,
   });
 }
 
-function nodeLoadBinaryFromFile(
+function nodeReadBinaryFromFile(
   path: URL,
   options?: ReadBinaryFromFileOptions,
 ): Promise<Uint8Array> {
@@ -59,7 +64,7 @@ function nodeLoadBinaryFromFile(
   }) as unknown as Promise<Uint8Array>;
 }
 
-async function nodeLoadDirectoryContents(
+async function nodeReadDirectoryContents(
   path: URL,
   options?: DirectoryContentsReaderOptions,
 ): Promise<DirectoryEntry[]> {
@@ -86,12 +91,12 @@ export function makeNodePlatform(): Platform {
   return Object.freeze({
     fileReader: {
       name: "fs.readFile",
-      readTextFromFile: nodeLoadTextFromFile,
-      readBinaryFromFile: nodeLoadBinaryFromFile,
+      readTextFromFile: nodeReadTextFromFile,
+      readBinaryFromFile: nodeReadBinaryFromFile,
     },
     directoryContentsReader: {
       name: "fs.readdir",
-      loadDirectoryContents: nodeLoadDirectoryContents,
+      readDirectoryContents: nodeReadDirectoryContents,
     },
   });
 }

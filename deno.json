@@ -1,11 +1,17 @@
 {
   "name": "@scroogieboy/directory-to-object",
-  "version": "0.5.3",
-  "exports": "./mod.ts",
+  "version": "0.6.0",
+  "exports": {
+    ".": "./mod.ts",
+    "./factories": "./factories.ts",
+    "./interfaces": "./interfaces.ts",
+    "./utility": "./utility.ts"
+  },
   "tasks": {
-    "check": "deno check *.ts",
-    "fmt": "deno fmt *.ts *.md",
-    "lint": "deno lint *.ts",
+    "check": "deno check mocks/*.ts *.ts",
+    "doc": "deno doc --html --output=docs mod.ts factories.ts interfaces.ts utility.ts",
+    "fmt": "deno fmt mocks/*.ts *.ts *.md",
+    "lint": "deno lint mocks/*.ts *.ts",
     "test": "deno test --coverage --allow-read *.test.ts"
   },
   "license": "MIT",
@@ -13,7 +19,8 @@
     "@cross/runtime": "jsr:@cross/runtime@^1.1.0",
     "@cross/test": "jsr:@cross/test@^0.0.9",
     "@es-toolkit/es-toolkit": "jsr:@es-toolkit/es-toolkit@^1.17.0",
-    "@std/assert": "jsr:@std/assert@^1.0.4"
+    "@std/assert": "jsr:@std/assert@^1.0.4",
+    "picomatch": "npm:picomatch@^4.0.2"
   },
   "publish": {
     "include": ["README.md", "LICENSE", "*.ts"],

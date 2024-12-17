@@ -9,5 +9,10 @@ set -e
 npm install
 
 cp ../*.ts .
+mkdir -p mocks
+cp ../mocks/*.ts mocks
+
 npx tsx --test *.test.ts
-rm *.ts
+
+rm ./*.ts
+rm -rf mocks

@@ -1,11 +1,10 @@
 import {
-  fileValueLoaders,
-  newBinaryFileValueLoader,
-  newFileReader,
+  defaultLoaders,
+  Loaders,
 } from "@scroogieboy/directory-to-object";
 
 // Create a binary file loader
-const binaryLoader = newBinaryFileValueLoader(newFileReader());
+const binaryLoader = Loaders.binaryFile();
 
 // Add this new binary loader to the loaders known by the `loadObjectFromDirectory` function.
-fileValueLoaders.set(".bin", binaryLoader);
+defaultLoaders.push(binaryLoader);

@@ -5,7 +5,8 @@
   "dependencies": {
     "@cross/runtime": "npm:@jsr/cross__runtime@^1.1.0",
     "@es-toolkit/es-toolkit": "npm:@jsr/es-toolkit__es-toolkit@^1.20.0-dev.629+fd119dd2",
-    "@std/assert": "npm:@jsr/std__assert@^1.0.4"
+    "@std/assert": "npm:@jsr/std__assert@^1.0.4",
+    "picomatch": "^4.0.2"
   },
   "devDependencies": {
     "@cross/test": "npm:@jsr/cross__test@^0.0.9",

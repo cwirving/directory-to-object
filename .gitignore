@@ -181,3 +181,6 @@ node/package-lock.json
 
 # The example directory lockfile
 examples/deno.lock
+
+# Documentation
+/docs

@@ -1,16 +1,12 @@
 import * as YAML from "@std/yaml";
-import {
-  fileValueLoaders,
-  newFileReader,
-  newStringParserFileValueLoader,
-} from "@scroogieboy/directory-to-object";
+import { defaultLoaders, Loaders } from "@scroogieboy/directory-to-object";
 
 // Create a YAML file loader
-const yamlLoader = newStringParserFileValueLoader(
-  newFileReader(),
-  YAML.parse,
-  "YAML file value loader",
-);
+const yamlLoader = Loaders.customFile({
+  extension: ".yaml",
+  name: "YAML file value loader",
+  parser: YAML.parse,
+});
 
-// Add it for the ".yaml" extension
-fileValueLoaders.set(".yaml", yamlLoader);
+// Add it to the default loaders
+defaultLoaders.push(yamlLoader);

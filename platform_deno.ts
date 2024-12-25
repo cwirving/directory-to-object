@@ -1,8 +1,8 @@
 import type {
-  DirectoryContentsReaderOptions,
   DirectoryEntry,
   DirectoryEntryType,
   ReadBinaryFromFileOptions,
+  ReadDirectoryContentsOptions,
   ReadTextFromFileOptions,
 } from "./interfaces.ts";
 import type { Platform } from "./platform.ts";
@@ -10,7 +10,7 @@ import type { Platform } from "./platform.ts";
 async function dirEntryToType(
   dirEntry: Deno.DirEntry,
   direEntryUrl: URL,
-  options?: DirectoryContentsReaderOptions,
+  options?: ReadDirectoryContentsOptions,
 ): Promise<DirectoryEntryType> {
   // Handle symlinks specially.
   if (dirEntry.isSymlink && options?.includeSymlinks) {
@@ -49,7 +49,7 @@ function denoReadBinaryFromFile(
 
 async function denoReadDirectoryContents(
   path: URL,
-  options?: DirectoryContentsReaderOptions,
+  options?: ReadDirectoryContentsOptions,
 ): Promise<DirectoryEntry[]> {
   const entries: DirectoryEntry[] = [];
 
@@ -70,13 +70,10 @@ async function denoReadDirectoryContents(
 
 export function makeDenoPlatform(): Platform {
   return Object.freeze({
-    fileReader: {
-      name: "Deno file reader",
+    fileSystemReader: {
+      name: "Deno file system reader",
       readTextFromFile: denoReadTextFromFile,
       readBinaryFromFile: denoReadBinaryFromFile,
-    },
-    directoryContentsReader: {
-      name: "Deno directory reader",
       readDirectoryContents: denoReadDirectoryContents,
     },
   });

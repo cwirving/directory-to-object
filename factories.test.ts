@@ -1,20 +1,20 @@
 import { test } from "@cross/test";
 import { assert, assertEquals, assertExists, assertRejects } from "@std/assert";
-import {
-  DefaultLoaderBuilder,
-  newDirectoryContentsReader,
-  newFileReader,
-} from "./factories.ts";
-import type { DirectoryEntry, ValueLoaderOptions } from "./interfaces.ts";
+import { newFileSystemReader, newLoaderBuilder } from "./factories.ts";
+import type {
+  DirectoryEntry,
+  DirectoryEntryInContext,
+  ValueLoaderOptions,
+} from "./interfaces.ts";
 import { merge } from "@es-toolkit/es-toolkit";
+import { MockFileSystemReader } from "./mocks/file_system_reader.mock.ts";
 
-const builder = new DefaultLoaderBuilder(
-  newFileReader(),
-  newDirectoryContentsReader(),
+const builder = newLoaderBuilder(
+  newFileSystemReader(),
 );
 
 test("newFileReader: load a file", async () => {
-  const reader = newFileReader();
+  const reader = newFileSystemReader();
 
   assertExists(reader, "The text file reader should be created.");
 
@@ -27,7 +27,7 @@ test("newFileReader: load a file", async () => {
 });
 
 test("newFileReader: load a binary file of zeros", async () => {
-  const reader = newFileReader();
+  const reader = newFileSystemReader();
 
   assertExists(reader, "The binary file reader should be created.");
 
@@ -49,7 +49,7 @@ test("newFileReader: load a binary file of zeros", async () => {
 });
 
 test("newFileReader: load a binary file of incrementing numbers", async () => {
-  const reader = newFileReader();
+  const reader = newFileSystemReader();
 
   assertExists(reader, "The binary file reader should be created.");
 
@@ -71,8 +71,8 @@ test("newFileReader: load a binary file of incrementing numbers", async () => {
   }
 });
 
-test("newDirectoryContentsReader: read a directory (no options)", async () => {
-  const directoryReader = newDirectoryContentsReader();
+test("newFileSystemReader: read a directory (no options)", async () => {
+  const directoryReader = newFileSystemReader();
 
   assertExists(
     directoryReader,
@@ -101,8 +101,8 @@ test("newDirectoryContentsReader: read a directory (no options)", async () => {
   assertEquals(entryMap.get("does_not_exist")?.type, "other");
 });
 
-test("newDirectoryContentsReader: read a directory (include symlinks)", async () => {
-  const directoryReader = newDirectoryContentsReader();
+test("newFileSystemReader: read a directory (include symlinks)", async () => {
+  const directoryReader = newFileSystemReader();
 
   assertExists(
     directoryReader,
@@ -132,8 +132,8 @@ test("newDirectoryContentsReader: read a directory (include symlinks)", async ()
   assertEquals(entryMap.get("does_not_exist")?.type, "other");
 });
 
-test("newDirectoryContentsReader: read a directory (aborted)", async () => {
-  const directoryReader = newDirectoryContentsReader();
+test("newFileSystemReader: read a directory (aborted)", async () => {
+  const directoryReader = newFileSystemReader();
 
   assertExists(
     directoryReader,
@@ -151,6 +151,71 @@ test("newDirectoryContentsReader: read a directory (aborted)", async () => {
       { signal: AbortSignal.abort("foo") },
     );
   });
+});
+
+test("Loaders.textFile returns a text file loader", async () => {
+  const loader = builder.textFile({ extension: ".txt" });
+  assertEquals(loader.name, "Text file value loader");
+
+  const entry: DirectoryEntryInContext = {
+    relativePath: "/text.txt",
+    name: "text.txt",
+    url: new URL("test_data/SimpleDirectory/text.txt", import.meta.url),
+    type: "file",
+  };
+  const textValue1 = await loader.loadValue(entry);
+  assertEquals(textValue1, "This is a test\n");
+
+  // Override the file system reader and try again
+  const mockReader = new MockFileSystemReader("xyz", {
+    binaryFiles: {},
+    directories: {},
+    textFiles: {
+      [entry.url.href]: "foo",
+    },
+  });
+  const textValue2 = await loader.loadValue(entry, {
+    fileSystemReader: mockReader,
+  });
+  assertEquals(textValue2, "foo");
+  assertEquals(mockReader.calls.readBinaryFromFile.length, 0);
+  assertEquals(mockReader.calls.readDirectoryContents.length, 0);
+  assertEquals(mockReader.calls.readTextFromFile.length, 1);
+});
+
+test("Loaders.binaryFile returns a binary file loader", async () => {
+  const loader = builder.binaryFile({ extension: ".bin" });
+  assertEquals(loader.name, "Binary file value loader");
+
+  const entry: DirectoryEntryInContext = {
+    relativePath: "/ramp.bin",
+    name: "ramp.bin",
+    url: new URL("test_data/FileBinaryReader/ramp.bin", import.meta.url),
+    type: "file",
+  };
+  const binaryValue1 = await loader.loadValue(entry);
+  assertEquals(binaryValue1.length, 32);
+
+  for (let index = 0; index < 32; ++index) {
+    const byte = binaryValue1[index];
+    assertEquals(byte, index);
+  }
+
+  // Override the file system reader and try again
+  const mockReader = new MockFileSystemReader("xyz", {
+    binaryFiles: {
+      [entry.url.href]: new Uint8Array(123),
+    },
+    directories: {},
+    textFiles: {},
+  });
+  const binaryValue2 = await loader.loadValue(entry, {
+    fileSystemReader: mockReader,
+  });
+  assertEquals(binaryValue2.length, 123);
+  assertEquals(mockReader.calls.readBinaryFromFile.length, 1);
+  assertEquals(mockReader.calls.readDirectoryContents.length, 0);
+  assertEquals(mockReader.calls.readTextFromFile.length, 0);
 });
 
 test("Loaders.defaults returns the expected defaults", async () => {
@@ -204,6 +269,43 @@ test("Loaders.defaults returns the expected defaults", async () => {
       }, { signal: AbortSignal.abort("bar") });
     }, "bar");
   }
+});
+
+test("directoryAsObject uses the provided file system reader in options", async () => {
+  const directoryLoader = builder.directoryAsObject({
+    loaders: builder.defaults(),
+  });
+
+  const mockReader = new MockFileSystemReader("xyz", {
+    binaryFiles: {},
+    directories: {
+      "file:///test_data/SimpleDirectory": [
+        {
+          name: "text.txt",
+          type: "file",
+          url: new URL("file:///test_data/SimpleDirectory/text.txt"),
+        },
+      ],
+    },
+    textFiles: {
+      "file:///test_data/SimpleDirectory/text.txt": "This is a test\n",
+    },
+  });
+
+  const result = await directoryLoader.loadDirectory(
+    new URL("file:///test_data/SimpleDirectory"),
+    { fileSystemReader: mockReader },
+  );
+
+  assertEquals(
+    result,
+    {
+      text: "This is a test\n",
+    },
+  );
+  assertEquals(mockReader.calls.readBinaryFromFile.length, 0);
+  assertEquals(mockReader.calls.readDirectoryContents.length, 1);
+  assertEquals(mockReader.calls.readTextFromFile.length, 1);
 });
 
 test("directoryAsObject reads SimpleDirectory", async () => {

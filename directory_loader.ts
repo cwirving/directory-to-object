@@ -1,6 +1,6 @@
 import type {
-  DirectoryContentsReader,
   DirectoryEntryInContext,
+  FileSystemReader,
   ValueLoader,
   ValueLoaderOptions,
 } from "./interfaces.ts";
@@ -42,20 +42,20 @@ abstract class DirectoryValueLoader
   implements ValueLoader<Record<string, unknown> | unknown[]> {
   readonly name: string;
   readonly #loaders: ValueLoader<unknown>[];
-  readonly #directoryReader: DirectoryContentsReader;
+  readonly #fileSystemReader: FileSystemReader;
   readonly #defaultOptions: Readonly<ValueLoaderOptions> | undefined;
 
   protected constructor(
     name: string,
     loaders: Iterable<ValueLoader<unknown>>,
-    directoryReader: DirectoryContentsReader,
+    fileSystemReader: FileSystemReader,
     defaultOptions?: Readonly<ValueLoaderOptions>,
   ) {
     this.name = name;
     const clonedLoaders = Array.from(loaders);
     clonedLoaders.push(this);
     this.#loaders = clonedLoaders;
-    this.#directoryReader = directoryReader;
+    this.#fileSystemReader = fileSystemReader;
     this.#defaultOptions = defaultOptions;
   }
 
@@ -110,7 +110,9 @@ abstract class DirectoryValueLoader
     mergedOptions?.signal?.throwIfAborted();
 
     const result = this.newEmptyResult();
-    const contents = await this.#directoryReader.readDirectoryContents(
+    const actualFileSystemReader = mergedOptions?.fileSystemReader ??
+      this.#fileSystemReader;
+    const contents = await actualFileSystemReader.readDirectoryContents(
       entry.url,
       options,
     ) as DirectoryEntryWithLoadingDecision[];
@@ -184,12 +186,15 @@ abstract class DirectoryValueLoader
     return result;
   }
 
+  // Embed the directory URL in te result, if requested and it is contextually appropriate.
   protected abstract embedDirectoryUrl(
     result: Record<string, unknown> | unknown[],
     entry: DirectoryEntryInContext,
     options?: Readonly<ValueLoaderOptions>,
   ): void;
 
+  // Set the current vale in the result object/array. The implementation depends on whether this is an object
+  // or array loader.
   protected abstract setValue(
     result: Record<string, unknown> | unknown[],
     decodedKey: string,
@@ -207,16 +212,16 @@ export class DirectoryObjectValueLoader extends DirectoryValueLoader
    *
    * @param name The name of the loader.
    * @param loaders An iterable collection of value loaders used to handle directory entries.
-   * @param directoryReader The directory contents reader responsible for reading the directory contents.
+   * @param fileSystemReader The directory contents reader responsible for reading the directory contents.
    * @param defaultOptions Optional default options for the loader.
    */
   constructor(
     name: string,
     loaders: Iterable<ValueLoader<unknown>>,
-    directoryReader: DirectoryContentsReader,
+    fileSystemReader: FileSystemReader,
     defaultOptions?: Readonly<ValueLoaderOptions>,
   ) {
-    super(name, loaders, directoryReader, defaultOptions);
+    super(name, loaders, fileSystemReader, defaultOptions);
   }
 
   newEmptyResult(): Record<string, unknown> {
@@ -265,16 +270,16 @@ export class DirectoryArrayValueLoader extends DirectoryValueLoader
    *
    * @param name The name of the loader.
    * @param loaders An iterable collection of value loaders used to handle directory entries.
-   * @param directoryReader The directory contents reader responsible for reading the directory contents.
+   * @param fileSystemReader The directory contents reader responsible for reading the directory contents.
    * @param defaultOptions Optional default options for the loader.
    */
   constructor(
     name: string,
     loaders: Iterable<ValueLoader<unknown>>,
-    directoryReader: DirectoryContentsReader,
+    fileSystemReader: FileSystemReader,
     defaultOptions?: Readonly<ValueLoaderOptions>,
   ) {
-    super(name, loaders, directoryReader, defaultOptions);
+    super(name, loaders, fileSystemReader, defaultOptions);
   }
 
   newEmptyResult(): unknown[] {

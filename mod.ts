@@ -3,19 +3,15 @@ import type {
   LoaderBuilder,
   ValueLoaderOptions,
 } from "./interfaces.ts";
-import {
-  DefaultLoaderBuilder,
-  newDirectoryContentsReader,
-  newFileReader,
-} from "./factories.ts";
+import { newFileSystemReader } from "./factories.ts";
+import { DefaultLoaderBuilder } from "./loader_builder.ts";
 
 /**
  * The loader builder to create any of the built-in loaders and customize them to your needs. See the
  * {@linkcode LoaderBuilder} interface for more details.
  */
 export const Loaders: LoaderBuilder = new DefaultLoaderBuilder(
-  newFileReader(),
-  newDirectoryContentsReader(),
+  newFileSystemReader(),
 );
 
 /**

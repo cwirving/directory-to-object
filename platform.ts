@@ -1,7 +1,7 @@
 import { CurrentRuntime, Runtime } from "@cross/runtime";
 import { makeDenoPlatform } from "./platform_deno.ts";
 import { makeNodePlatform } from "./platform_node.ts";
-import type { DirectoryContentsReader, FileReader } from "./interfaces.ts";
+import type { FileSystemReader } from "./interfaces.ts";
 
 const nodeLikeRuntimes = [Runtime.Bun, Runtime.Node];
 
@@ -9,9 +9,11 @@ export function runtimeIsNodeLike(runtime: Runtime): boolean {
   return nodeLikeRuntimes.includes(runtime);
 }
 
+/**
+ * All the things we expect from the runtime platform.
+ */
 export interface Platform {
-  fileReader: FileReader;
-  directoryContentsReader: DirectoryContentsReader;
+  fileSystemReader: FileSystemReader;
 }
 
 function getCurrentPlatform(): Platform {

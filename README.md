@@ -47,6 +47,31 @@ See the
 [`@scroogieboy/directory-to-object-cli`](https://jsr.io/@scroogieboy/directory-to-object-cli)
 package for a simple CLI tool that exercises the capabilities of this library.
 
+## Installation
+
+### Deno
+
+```
+deno add jsr:@scroogieboy/directory-to-object
+```
+
+### Bun
+
+```
+bunx jsr add @scroogieboy/directory-to-object
+```
+
+### Node.js
+
+```
+npx jsr add @scroogieboy/directory-to-object
+```
+
+This is an ESM-only package, so -- as per the
+[JSR documentation](https://jsr.io/docs/with/node), this means that the
+consuming project must be an ESM project (`"type": "module"` in the project's
+`package.json` ).
+
 ## Example
 
 Loading a configuration directory is as simple as (Node.js example):
@@ -68,27 +93,29 @@ The main concepts in the library are:
 - Value loaders (implementing the `ValueLoader` interface) which can load the
   contents of files or directories. These loaders are platform-agnostic and use
   the readers to perform actual I/O.
-- Platform-specific directory contents readers (which list the contents of
-  directories).
-- Platform-specific file readers that perform the low-level file reading used by
-  file value loaders.
+- Platform-specific file system readers that perform the low-level file reading
+  and directory listing used by value loaders.
 
 The top-level `loadObjectFromDirectory` function is a convenience wrapper around
 default implementations of these concepts.
 
 ### Changing the directory processing logic
 
-A generic directory to object loader can be constructed using the `Loaders`
-builder, which automatically determines the reader implementations to use for
-the current platform. Consumers can also write their own loaders from scratch
-and implement readers for new platforms.
+Generic directory to object and directory to array loaders can be constructed
+using the `Loaders` builder, which automatically determines the reader
+implementations to use for the current platform. Consumers can also write their
+own loaders from scratch.
 
 ### Changing how directories are read
 
-The `newDirectoryContentsReader` function creates a directory contents reader
-for the current runtime. The current runtimes supported include Deno, Node.js
-and Bun and the directory contents reader for each platform only support file
-system directories.
+The `factories/newFileSystemReader` function creates a new file system reader
+implementation for the current runtime. The current runtimes supported include
+Deno, Node.js and Bun. It is relatively straightforward to write new file system
+readers for other platforms (e.g., retrieving them over the network or to
+support compound file formats). New file system readers can be put to use either
+by creating a new loader builder instance using the `factories/newLoaderBuilder`
+function or by using the `withFileSystemReader` fluent reader method to
+customize the reader that will be used by that loader and any nested loaders.
 
 ### Changing how files are read and adding new file formats
 
@@ -137,7 +164,8 @@ defaultLoaders.push(yamlLoader);
 
 ### Writing your own loaders
 
-Value loaders implement the {@linkcode ValueLoader} interface:
+Value loaders implement the `ValueLoader` interface: Value loaders implement the
+`ValueLoader` interface:
 
 ```typescript
 interface ValueLoader<TValue> {
@@ -165,9 +193,9 @@ from file names as their key "computation". However, the loader can also return
 
 `loadValue` is called to actually load the value from the file system.
 
-Interface {@linkcode ValueLoader} is all that is necessary to implement in a
-loader, then the `utility/makeFluent` function can be used to wrap it in a full
-implementation of interface {@linkcode FluentLoader}.
+Interface `ValueLoader` is all that is necessary to implement in a loader, then
+the `utility/makeFluent` function can be used to wrap it in a full
+implementation of interface `FluentLoader`.
 
 ### Taking control: using the `Loaders` builder
 

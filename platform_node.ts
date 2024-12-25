@@ -1,8 +1,8 @@
 import type {
-  DirectoryContentsReaderOptions,
   DirectoryEntry,
   DirectoryEntryType,
   ReadBinaryFromFileOptions,
+  ReadDirectoryContentsOptions,
   ReadTextFromFileOptions,
 } from "./interfaces.ts";
 import * as fsPromises from "node:fs/promises";
@@ -13,7 +13,7 @@ import type { Platform } from "./platform.ts";
 async function direntToType(
   dirent: Dirent,
   direntUrl: URL,
-  options?: DirectoryContentsReaderOptions,
+  options?: ReadDirectoryContentsOptions,
 ): Promise<DirectoryEntryType> {
   if (dirent.isSymbolicLink() && options?.includeSymlinks) {
     try {
@@ -66,7 +66,7 @@ function nodeReadBinaryFromFile(
 
 async function nodeReadDirectoryContents(
   path: URL,
-  options?: DirectoryContentsReaderOptions,
+  options?: ReadDirectoryContentsOptions,
 ): Promise<DirectoryEntry[]> {
   const entries: DirectoryEntry[] = [];
   const nodeEntries = await fsPromises.readdir(path, { withFileTypes: true });
@@ -89,13 +89,10 @@ async function nodeReadDirectoryContents(
 
 export function makeNodePlatform(): Platform {
   return Object.freeze({
-    fileReader: {
-      name: "fs.readFile",
+    fileSystemReader: {
+      name: "Node.js file system reader",
       readTextFromFile: nodeReadTextFromFile,
       readBinaryFromFile: nodeReadBinaryFromFile,
-    },
-    directoryContentsReader: {
-      name: "fs.readdir",
       readDirectoryContents: nodeReadDirectoryContents,
     },
   });

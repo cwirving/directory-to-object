@@ -10,7 +10,7 @@ import {
   DirectoryArrayValueLoader,
   DirectoryObjectValueLoader,
 } from "./directory_loader.ts";
-import { MockDirectoryContentsReader } from "./mocks/directory_contents_reader.mock.ts";
+import { MockFileSystemReader } from "./mocks/file_system_reader.mock.ts";
 import { isRecord } from "./is_record.ts";
 
 const neverCalledValueLoader: ValueLoader<unknown> = {
@@ -46,9 +46,9 @@ test("Directory loader honors loader iteration order", async () => {
     },
     canLoadValue: (entry) => entry.url.pathname.endsWith(".a.b.c"),
   });
-  const mockDirectoryContentsReader = new MockDirectoryContentsReader(
+  const mockFileSystemReader = new MockFileSystemReader(
     "reader",
-    {},
+    { binaryFiles: {}, directories: {}, textFiles: {} },
   );
 
   const loaders = [
@@ -58,17 +58,21 @@ test("Directory loader honors loader iteration order", async () => {
     neverCalledValueLoader,
   ];
 
-  mockDirectoryContentsReader.contents = {
-    "file:///": [{
-      name: "foo.c",
-      type: "file",
-      url: new URL("file:///foo.c"),
-    }],
+  mockFileSystemReader.contents = {
+    binaryFiles: {},
+    directories: {
+      "file:///": [{
+        name: "foo.c",
+        type: "file",
+        url: new URL("file:///foo.c"),
+      }],
+    },
+    textFiles: {},
   };
   const dv1 = new DirectoryObjectValueLoader(
     "directory loader",
     loaders,
-    mockDirectoryContentsReader,
+    mockFileSystemReader,
   );
   const abortController = new AbortController();
   const entry1: DirectoryEntryInContext = {
@@ -108,17 +112,21 @@ test("Directory loader honors loader iteration order", async () => {
   loader1.reset();
   loader2.reset();
   loader3.reset();
-  mockDirectoryContentsReader.contents = {
-    "file:///": [{
-      name: "foo.b.c",
-      type: "file",
-      url: new URL("file:///foo.b.c"),
-    }],
+  mockFileSystemReader.contents = {
+    binaryFiles: {},
+    directories: {
+      "file:///": [{
+        name: "foo.b.c",
+        type: "file",
+        url: new URL("file:///foo.b.c"),
+      }],
+    },
+    textFiles: {},
   };
   const dv2 = new DirectoryObjectValueLoader(
     "directory loader",
     loaders,
-    mockDirectoryContentsReader,
+    mockFileSystemReader,
   );
   const options2 = {};
   const returned2 = await dv2.loadValue(entry1, options2);
@@ -143,17 +151,21 @@ test("Directory loader honors loader iteration order", async () => {
   loader1.reset();
   loader2.reset();
   loader3.reset();
-  mockDirectoryContentsReader.contents = {
-    "file:///": [{
-      name: "foo.a.b.c",
-      type: "file",
-      url: new URL("file:///foo.a.b.c"),
-    }],
+  mockFileSystemReader.contents = {
+    binaryFiles: {},
+    directories: {
+      "file:///": [{
+        name: "foo.a.b.c",
+        type: "file",
+        url: new URL("file:///foo.a.b.c"),
+      }],
+    },
+    textFiles: {},
   };
   const dv3 = new DirectoryObjectValueLoader(
     "directory loader",
     loaders,
-    mockDirectoryContentsReader,
+    mockFileSystemReader,
   );
   const options3 = {};
   const returned3 = await dv3.loadValue(entry1, options2);
@@ -190,33 +202,37 @@ test("DirectoryValueLoader honors options", async () => {
     },
   });
 
-  const reader = new MockDirectoryContentsReader("reader", {
-    "file:///dir": [{
-      name: "a.txt",
-      type: "file",
-      url: new URL("file:///dir/a.txt"),
-    }, {
-      name: "b.txt",
-      type: "file",
-      url: new URL("file:///dir/b.txt"),
-    }, {
-      name: "c",
-      type: "directory",
-      url: new URL("file:///dir/c"),
-    }, {
-      name: "e.json",
-      type: "file",
-      url: new URL("file:///dir/e.json"),
-    }, {
-      name: "x",
-      type: "other",
-      url: new URL("file:///dir/x"),
-    }],
-    "file:///dir/c": [{
-      name: "d.txt",
-      type: "file",
-      url: new URL("file:///dir/c/d.txt"),
-    }],
+  const reader = new MockFileSystemReader("reader", {
+    binaryFiles: {},
+    directories: {
+      "file:///dir": [{
+        name: "a.txt",
+        type: "file",
+        url: new URL("file:///dir/a.txt"),
+      }, {
+        name: "b.txt",
+        type: "file",
+        url: new URL("file:///dir/b.txt"),
+      }, {
+        name: "c",
+        type: "directory",
+        url: new URL("file:///dir/c"),
+      }, {
+        name: "e.json",
+        type: "file",
+        url: new URL("file:///dir/e.json"),
+      }, {
+        name: "x",
+        type: "other",
+        url: new URL("file:///dir/x"),
+      }],
+      "file:///dir/c": [{
+        name: "d.txt",
+        type: "file",
+        url: new URL("file:///dir/c/d.txt"),
+      }],
+    },
+    textFiles: {},
   });
 
   const entry: DirectoryEntryInContext = {
@@ -277,22 +293,26 @@ test("Array directory loader creates arrays", async () => {
   const loader = new MockValueLoader("loader 1", {
     contents: { "file:///foo": 1, "file:///bar": 2, "file:///baz": 3 },
   });
-  const mockDirectoryContentsReader = new MockDirectoryContentsReader(
+  const mockFileSystemReader = new MockFileSystemReader(
     "reader",
     {
-      "file:///": [{
-        name: "foo",
-        type: "file",
-        url: new URL("file:///foo"),
-      }, {
-        name: "bar",
-        type: "file",
-        url: new URL("file:///bar"),
-      }, {
-        name: "baz",
-        type: "file",
-        url: new URL("file:///baz"),
-      }],
+      binaryFiles: {},
+      directories: {
+        "file:///": [{
+          name: "foo",
+          type: "file",
+          url: new URL("file:///foo"),
+        }, {
+          name: "bar",
+          type: "file",
+          url: new URL("file:///bar"),
+        }, {
+          name: "baz",
+          type: "file",
+          url: new URL("file:///baz"),
+        }],
+      },
+      textFiles: {},
     },
   );
 
@@ -301,7 +321,7 @@ test("Array directory loader creates arrays", async () => {
   const dv = new DirectoryArrayValueLoader(
     "directory loader",
     loaders,
-    mockDirectoryContentsReader,
+    mockFileSystemReader,
   );
   const entry: DirectoryEntryInContext = {
     name: "",
@@ -320,22 +340,26 @@ test("Array directory loader creates sparse arrays when names are numbers", asyn
   const loader = new MockValueLoader("loader 1", {
     contents: { "file:///0": 1, "file:///42": 2, "file:///99": 3 },
   });
-  const mockDirectoryContentsReader = new MockDirectoryContentsReader(
+  const mockFileSystemReader = new MockFileSystemReader(
     "reader",
     {
-      "file:///": [{
-        name: "0",
-        type: "file",
-        url: new URL("file:///0"),
-      }, {
-        name: "42",
-        type: "file",
-        url: new URL("file:///42"),
-      }, {
-        name: "99",
-        type: "file",
-        url: new URL("file:///99"),
-      }],
+      binaryFiles: {},
+      directories: {
+        "file:///": [{
+          name: "0",
+          type: "file",
+          url: new URL("file:///0"),
+        }, {
+          name: "42",
+          type: "file",
+          url: new URL("file:///42"),
+        }, {
+          name: "99",
+          type: "file",
+          url: new URL("file:///99"),
+        }],
+      },
+      textFiles: {},
     },
   );
 
@@ -344,7 +368,7 @@ test("Array directory loader creates sparse arrays when names are numbers", asyn
   const dv = new DirectoryArrayValueLoader(
     "directory loader",
     loaders,
-    mockDirectoryContentsReader,
+    mockFileSystemReader,
   );
   const entry: DirectoryEntryInContext = {
     name: "",
@@ -374,22 +398,26 @@ test("Array directory loader creates sparse arrays when names are numbers, even 
       return (dotIndex >= 0) ? entry.name.substring(0, dotIndex) : entry.name;
     },
   });
-  const mockDirectoryContentsReader = new MockDirectoryContentsReader(
+  const mockFileSystemReader = new MockFileSystemReader(
     "reader",
     {
-      "file:///": [{
-        name: "9.json",
-        type: "file",
-        url: new URL("file:///9.json"),
-      }, {
-        name: "42.json",
-        type: "file",
-        url: new URL("file:///42.json"),
-      }, {
-        name: "99.json",
-        type: "file",
-        url: new URL("file:///99.json"),
-      }],
+      binaryFiles: {},
+      directories: {
+        "file:///": [{
+          name: "9.json",
+          type: "file",
+          url: new URL("file:///9.json"),
+        }, {
+          name: "42.json",
+          type: "file",
+          url: new URL("file:///42.json"),
+        }, {
+          name: "99.json",
+          type: "file",
+          url: new URL("file:///99.json"),
+        }],
+      },
+      textFiles: {},
     },
   );
 
@@ -398,7 +426,7 @@ test("Array directory loader creates sparse arrays when names are numbers, even 
   const dv = new DirectoryArrayValueLoader(
     "directory loader",
     loaders,
-    mockDirectoryContentsReader,
+    mockFileSystemReader,
   );
   const entry: DirectoryEntryInContext = {
     name: "",
@@ -419,22 +447,26 @@ test("Array directory loader puts non-numeric entries after numbers in loaded sp
   const loader = new MockValueLoader("loader 1", {
     contents: { "file:///0": 1, "file:///42": 2, "file:///a": 3 },
   });
-  const mockDirectoryContentsReader = new MockDirectoryContentsReader(
+  const mockFileSystemReader = new MockFileSystemReader(
     "reader",
     {
-      "file:///": [{
-        name: "0",
-        type: "file",
-        url: new URL("file:///0"),
-      }, {
-        name: "a",
-        type: "file",
-        url: new URL("file:///a"),
-      }, {
-        name: "42",
-        type: "file",
-        url: new URL("file:///42"),
-      }],
+      binaryFiles: {},
+      directories: {
+        "file:///": [{
+          name: "0",
+          type: "file",
+          url: new URL("file:///0"),
+        }, {
+          name: "a",
+          type: "file",
+          url: new URL("file:///a"),
+        }, {
+          name: "42",
+          type: "file",
+          url: new URL("file:///42"),
+        }],
+      },
+      textFiles: {},
     },
   );
 
@@ -443,7 +475,7 @@ test("Array directory loader puts non-numeric entries after numbers in loaded sp
   const dv = new DirectoryArrayValueLoader(
     "directory loader",
     loaders,
-    mockDirectoryContentsReader,
+    mockFileSystemReader,
   );
   const entry: DirectoryEntryInContext = {
     name: "",
@@ -460,27 +492,31 @@ test("Array directory loader puts non-numeric entries after numbers in loaded sp
   assertEquals(returned[43], 3);
 });
 
-test("Array directory loader skips entries rejected by loaders", async () => {
+function setupTestArrayDirectoryLoader() {
   const loader = new MockValueLoader("loader 1", {
     contents: { "file:///foo": 1, "file:///bar": 2, "file:///baz": 3 },
     canLoadValue: (entry) => entry.name !== "bar",
   });
-  const mockDirectoryContentsReader = new MockDirectoryContentsReader(
+  const mockFileSystemReader = new MockFileSystemReader(
     "reader",
     {
-      "file:///": [{
-        name: "foo",
-        type: "file",
-        url: new URL("file:///foo"),
-      }, {
-        name: "bar",
-        type: "file",
-        url: new URL("file:///bar"),
-      }, {
-        name: "baz",
-        type: "file",
-        url: new URL("file:///baz"),
-      }],
+      binaryFiles: {},
+      directories: {
+        "file:///": [{
+          name: "foo",
+          type: "file",
+          url: new URL("file:///foo"),
+        }, {
+          name: "bar",
+          type: "file",
+          url: new URL("file:///bar"),
+        }, {
+          name: "baz",
+          type: "file",
+          url: new URL("file:///baz"),
+        }],
+      },
+      textFiles: {},
     },
   );
 
@@ -489,7 +525,7 @@ test("Array directory loader skips entries rejected by loaders", async () => {
   const dv = new DirectoryArrayValueLoader(
     "directory loader",
     loaders,
-    mockDirectoryContentsReader,
+    mockFileSystemReader,
   );
   const entry: DirectoryEntryInContext = {
     name: "",
@@ -497,6 +533,12 @@ test("Array directory loader skips entries rejected by loaders", async () => {
     url: new URL("file:///"),
     type: "directory",
   };
+  return { dv, entry };
+}
+
+test("Array directory loader skips entries rejected by loaders", async () => {
+  const { dv, entry } = setupTestArrayDirectoryLoader();
+
   const returned = await dv.loadValue(entry);
   assert(Array.isArray(returned));
 
@@ -505,42 +547,7 @@ test("Array directory loader skips entries rejected by loaders", async () => {
 });
 
 test("Array directory implements strict mode", async () => {
-  const loader = new MockValueLoader("loader 1", {
-    contents: { "file:///foo": 1, "file:///bar": 2, "file:///baz": 3 },
-    canLoadValue: (entry) => entry.name !== "bar",
-  });
-  const mockDirectoryContentsReader = new MockDirectoryContentsReader(
-    "reader",
-    {
-      "file:///": [{
-        name: "foo",
-        type: "file",
-        url: new URL("file:///foo"),
-      }, {
-        name: "bar",
-        type: "file",
-        url: new URL("file:///bar"),
-      }, {
-        name: "baz",
-        type: "file",
-        url: new URL("file:///baz"),
-      }],
-    },
-  );
-
-  const loaders = [loader];
-
-  const dv = new DirectoryArrayValueLoader(
-    "directory loader",
-    loaders,
-    mockDirectoryContentsReader,
-  );
-  const entry: DirectoryEntryInContext = {
-    name: "",
-    relativePath: "",
-    url: new URL("file:///"),
-    type: "directory",
-  };
+  const { dv, entry } = setupTestArrayDirectoryLoader();
 
   await assertRejects(() => dv.loadValue(entry, { strict: true }));
 });

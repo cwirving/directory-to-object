@@ -10,8 +10,8 @@
  * {@linkcode ValueLoader.loadValue} method to control the loading behavior (e.g., to map file names
  * to property names, control value merging behavior, etc.).
  *
- * The {@linkcode FileReader} and {@linkcode DirectoryContentsReader} interfaces are the low-level abstractions over the
- * underlying runtime platform. Deno and Node.js/Bun have implementations built into the library, but it is possible
+ * The {@linkcode FileSystemReader} interfaces is a low-level abstractions over the underlying runtime platform's
+ * file system functionality. Deno and Node.js/Bun have implementations built into the library, but it is possible
  * to write additional implementations over other file system-like media and use them with the library.
  *
  * @module
@@ -30,21 +30,64 @@ export interface WithOptionalSignal {
 }
 
 /**
- * Options passed to the {@link FileReader} {@linkcode FileReader.readTextFromFile | readTextFromFile} method.
+ * Options passed to the {@link FileSystemReader} {@linkcode FileReader.readTextFromFile | readTextFromFile} method.
  */
 export interface ReadTextFromFileOptions extends WithOptionalSignal {
 }
 
 /**
- * Options passed to the {@link FileReader} {@linkcode FileReader.readBinaryFromFile | readBinaryFromFile} method.
+ * Options passed to the {@link FileSystemReader} {@linkcode FileReader.readBinaryFromFile | readBinaryFromFile} method.
  */
 export interface ReadBinaryFromFileOptions extends WithOptionalSignal {
 }
 
 /**
- * Interface of a reader that can read text files into strings and binary files into `Uint8Array`s..
+ * The type of directory entry returned by a {@link FileSystemReader}.
+ *
+ * This is a simplification of what is possible in the file system to only cover the cases
+ * relevant to this library, namely files, directories and everything else.
  */
-export interface FileReader {
+export type DirectoryEntryType = "file" | "directory" | "other";
+
+/**
+ * Interface of each directory entry returned by the {@link FileSystemReader} {@linkcode FileSystemReader.loadDirectoryContents | loadDirectoryContents} method.
+ */
+export interface DirectoryEntry {
+  /**
+   * The name of the directory entry, without any path, but with its extension.
+   */
+  name: string;
+
+  /**
+   * The type of the directory entry -- "file", "directory" or "other".
+   */
+  type: DirectoryEntryType;
+
+  /**
+   * The URL of the directory entry. This can be used to fetch the directory using a suitable reader.
+   */
+  url: URL;
+}
+
+/**
+ * Options passed to the {@link FileSystemReader} {@linkcode FileSystemReader.loadDirectoryContents | loadDirectoryContents} method.
+ */
+export interface ReadDirectoryContentsOptions extends WithOptionalSignal {
+  /**
+   * If `true`, the directory reader considers symbolic links as actual files and directories
+   * (based on the destination of the link). If `false` (the default), links are treated as
+   * having a type of "other".
+   *
+   * The default is `false` to avoid needlessly putting a loader at risk with malformed (e.g., circular) links,
+   * when they are unusual in a configuration context.
+   */
+  includeSymlinks?: boolean;
+}
+
+/**
+ * Interface of a reader that can read files and list directory contents from the file system.
+ */
+export interface FileSystemReader {
   /**
    * The name of the reader. For runtime debugging purposes.
    */
@@ -73,60 +116,6 @@ export interface FileReader {
     path: URL,
     options?: Readonly<ReadBinaryFromFileOptions>,
   ): Promise<Uint8Array>;
-}
-
-/**
- * The type of directory entry returned by a {@link DirectoryContentsReader}.
- *
- * This is a simplification of what is possible in the file system to only cover the cases
- * relevant to this library, namely files, directories and everything else.
- */
-export type DirectoryEntryType = "file" | "directory" | "other";
-
-/**
- * Interface of each directory entry returned by the {@link DirectoryContentsReader} {@linkcode DirectoryContentsReader.loadDirectoryContents | loadDirectoryContents} method.
- */
-export interface DirectoryEntry {
-  /**
-   * The name of the directory entry, without any path, but with its extension.
-   */
-  name: string;
-
-  /**
-   * The type of the directory entry -- "file", "directory" or "other".
-   */
-  type: DirectoryEntryType;
-
-  /**
-   * The URL of the directory entry. This can be used to fetch the directory using a suitable reader.
-   */
-  url: URL;
-}
-
-/**
- * Options passed to the {@link DirectoryContentsReader} {@linkcode DirectoryContentsReader.loadDirectoryContents | loadDirectoryContents} method.
- */
-export interface DirectoryContentsReaderOptions extends WithOptionalSignal {
-  /**
-   * If `true`, the directory reader considers symbolic links as actual files and directories
-   * (based on the destination of the link). If `false` (the default), links are treated as
-   * having a type of "other".
-   *
-   * The default is `false` to avoid needlessly putting a loader at risk with malformed (e.g., circular) links,
-   * when they are unusual in a configuration context.
-   */
-  includeSymlinks?: boolean;
-}
-
-/**
- * Interface of a directory contents reader, that can asynchronously read the contents of a directory
- * and return it as an array of objects implementing the {@link DirectoryEntry} interface.
- */
-export interface DirectoryContentsReader {
-  /**
-   * The name of the reader. For runtime debugging purposes.
-   */
-  readonly name: string;
 
   /**
    * Asynchronously read a directory's contents and return it as an array of objects implementing
@@ -134,11 +123,11 @@ export interface DirectoryContentsReader {
    *
    * @param path The URL of the directory to read.
    * @param options Options to apply to the reader.
-   * @returns A promise to an array of **mutable** objects implementing the {@link DirectoryEntry} interface, each representing a file/directory in the directory.
+   * @returns A promise to an array of **mutable** objects implementing the {@link DirectoryEntry} interface, each representing a file/directory in the directory. The directory loader may mutate both arrays and items as needed.
    */
   readDirectoryContents(
     path: URL,
-    options?: Readonly<DirectoryContentsReaderOptions>,
+    options?: Readonly<ReadDirectoryContentsOptions>,
   ): Promise<DirectoryEntry[]>;
 }
 
@@ -182,7 +171,14 @@ export type MergeFn<TValue> = (
  * Options passed to the {@link ValueLoader} {@linkcode DirectoryObjectLoader.loadObjectFromDirectory | loadValueFromFile} method.
  */
 export interface ValueLoaderOptions
-  extends FileValueLoaderOptions, DirectoryContentsReaderOptions {
+  extends FileValueLoaderOptions, ReadDirectoryContentsOptions {
+  /**
+   * When specified, this file system reader overrides the file system reader that the loaders should use.
+   * This allows consumers to build loaders using this library but use them with a completely different file system
+   * implementation (e.g., to read the contents of an archive file instead of the platform file system).
+   */
+  fileSystemReader?: FileSystemReader;
+
   /**
    * The merge function that will be used to merge array values in loaded objects.
    * This is only called when both existing and new values are arrays.
@@ -304,6 +300,20 @@ export interface FluentLoader<TValue> extends ValueLoader<TValue> {
    * @returns A new loader with the same behavior but with the new name.
    */
   withName(name: string): FluentLoader<TValue>;
+
+  /**
+   * Override the file system reader that the loader was initialized with and use the reader
+   * provided instead. This behaves as if the new reader was passed in the `options` parameter to
+   * {@linkcode ValueLoader.loadValue}, so it will also apply to any nested loaders.
+   *
+   * Additionally, any file system reader present in the `options` passed to {@linkcode ValueLoader.loadValue}
+   * at runtime will be ignored -- this override takes priority.
+   *
+   * @param fileSystemReader
+   */
+  withFileSystemReader(
+    fileSystemReader: FileSystemReader,
+  ): FluentLoader<TValue>;
 
   /**
    * Provide a `canLoadValue` implementation in addition to this loader's. The resulting loader will only load entries
@@ -464,9 +474,20 @@ export interface FileLoaderBuildOptions {
  */
 export type StringParserFunc = (input: string) => unknown;
 
+/**
+ * The signature of the `canLoadValue` value loader method.
+ */
 export type CanLoadValueFunc = (
   entry: DirectoryEntryInContext,
 ) => boolean | Promise<boolean>;
+
+/**
+ * The signature of the `loadValue` value loader method.
+ */
+export type LoadValueFunc<TValue> = (
+  entry: DirectoryEntryInContext,
+  options?: Readonly<ValueLoaderOptions>,
+) => Promise<TValue>;
 
 export interface CustomFileLoaderBuildOptions extends FileLoaderBuildOptions {
   parser: StringParserFunc;

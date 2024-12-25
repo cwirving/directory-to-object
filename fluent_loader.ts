@@ -2,7 +2,9 @@ import picomatch from "picomatch";
 import type {
   CanLoadValueFunc,
   DirectoryEntryInContext,
+  FileSystemReader,
   FluentLoader,
+  LoadValueFunc,
   ValueLoader,
   ValueLoaderOptions,
 } from "./interfaces.ts";
@@ -11,7 +13,7 @@ import { ensureIsDefined } from "./ensure_is_defined.ts";
 /**
  * Overrides applied by the `FluentLoaderImpl` on top of the inner loader.
  */
-interface FluentOverrides {
+interface FluentOverrides<TValue> {
   /**
    * This is the new name of the loader.
    */
@@ -31,6 +33,11 @@ interface FluentOverrides {
    * @returns The key computed by this loader.
    */
   computeKey?: (name: string) => string | undefined;
+
+  /**
+   * If present, call this instead of the inner loader's `loadValue` method.
+   */
+  loadValue?: LoadValueFunc<TValue>;
 }
 
 /**
@@ -53,11 +60,11 @@ export async function asyncAnd(
  */
 export class FluentLoaderImpl<TValue> implements FluentLoader<TValue> {
   readonly #innerLoader: ValueLoader<TValue>;
-  readonly #overrides: FluentOverrides;
+  readonly #overrides: FluentOverrides<TValue>;
 
   protected constructor(
     innerLoader: ValueLoader<TValue>,
-    overrides: FluentOverrides,
+    overrides: FluentOverrides<TValue>,
   ) {
     this.#innerLoader = innerLoader;
     this.#overrides = overrides;
@@ -73,7 +80,7 @@ export class FluentLoaderImpl<TValue> implements FluentLoader<TValue> {
    */
   static newLoader<TValue>(
     innerLoader: ValueLoader<TValue>,
-    overrides: FluentOverrides = {},
+    overrides: FluentOverrides<TValue> = {},
   ): FluentLoader<TValue> {
     return Object.freeze(new FluentLoaderImpl(innerLoader, overrides));
   }
@@ -116,6 +123,22 @@ export class FluentLoaderImpl<TValue> implements FluentLoader<TValue> {
   withName(name: string): FluentLoader<TValue> {
     return FluentLoaderImpl.newLoader<TValue>(this.#innerLoader, {
       name: name,
+    });
+  }
+
+  withFileSystemReader(
+    fileSystemReader: FileSystemReader,
+  ): FluentLoader<TValue> {
+    return FluentLoaderImpl.newLoader<TValue>(this.#innerLoader, {
+      loadValue: (
+        entry: DirectoryEntryInContext,
+        options?: Readonly<ValueLoaderOptions>,
+      ) => {
+        return this.#innerLoader.loadValue(entry, {
+          ...options,
+          fileSystemReader: fileSystemReader,
+        });
+      },
     });
   }
 
@@ -224,7 +247,7 @@ export class FluentLoaderImpl<TValue> implements FluentLoader<TValue> {
  * the result of `makeFluent`, it returns the input without transformation.
  * Otherwise, creates and returns a new {@linkcode FluentLoader} implementation using the given loader.
  *
- * @param loader - The @linkcode ValueLoader} instance that provides values to be transformed into a {@linkcode FluentLoader}.
+ * @param loader - The {@linkcode ValueLoader} instance that provides values to be transformed into a {@linkcode FluentLoader}.
  * @return A {@linkcode FluentLoader} instance representing the transformed loader.
  */
 export function makeFluent<TValue>(

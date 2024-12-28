@@ -1,6 +1,6 @@
 {
   "name": "@scroogieboy/directory-to-object",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "exports": {
     ".": "./mod.ts",
     "./factories": "./factories.ts",

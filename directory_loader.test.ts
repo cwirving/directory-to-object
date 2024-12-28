@@ -48,7 +48,7 @@ test("Directory loader honors loader iteration order", async () => {
   });
   const mockFileSystemReader = new MockFileSystemReader(
     "reader",
-    { binaryFiles: {}, directories: {}, textFiles: {} },
+    { binaryFiles: {}, directories: {}, textFiles: {}, withDispose: true },
   );
 
   const loaders = [
@@ -84,6 +84,7 @@ test("Directory loader honors loader iteration order", async () => {
   const options1 = { signal: abortController.signal };
   const returned1 = await dv1.loadValue(entry1, options1);
   assert(isRecord(returned1));
+  assert(mockFileSystemReader.calls.readDirectoryContents.at(-1)?.disposed);
 
   assertEquals(returned1["foo.c"], 1);
   assertEquals(loader1.calls.canLoadValue.length, 1);
@@ -131,6 +132,7 @@ test("Directory loader honors loader iteration order", async () => {
   const options2 = {};
   const returned2 = await dv2.loadValue(entry1, options2);
   assert(isRecord(returned2));
+  assert(mockFileSystemReader.calls.readDirectoryContents.at(-1)?.disposed);
 
   assertEquals(returned2["foo.b.c"], 2);
   assertEquals(loader1.calls.canLoadValue.length, 0);
@@ -170,6 +172,7 @@ test("Directory loader honors loader iteration order", async () => {
   const options3 = {};
   const returned3 = await dv3.loadValue(entry1, options2);
   assert(isRecord(returned3));
+  assert(mockFileSystemReader.calls.readDirectoryContents.at(-1)?.disposed);
 
   assertEquals(returned3["foo.a.b.c"], 3);
   assertEquals(loader1.calls.canLoadValue.length, 0);

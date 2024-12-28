@@ -1,4 +1,5 @@
 import type {
+  DirectoryContents,
   DirectoryEntry,
   DirectoryEntryType,
   ReadBinaryFromFileOptions,
@@ -67,7 +68,7 @@ function nodeReadBinaryFromFile(
 async function nodeReadDirectoryContents(
   path: URL,
   options?: ReadDirectoryContentsOptions,
-): Promise<DirectoryEntry[]> {
+): Promise<DirectoryContents> {
   const entries: DirectoryEntry[] = [];
   const nodeEntries = await fsPromises.readdir(path, { withFileTypes: true });
 
@@ -84,7 +85,7 @@ async function nodeReadDirectoryContents(
     });
   }
 
-  return entries;
+  return { entries };
 }
 
 export function makeNodePlatform(): Platform {

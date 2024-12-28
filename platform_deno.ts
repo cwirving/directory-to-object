@@ -1,4 +1,5 @@
 import type {
+  DirectoryContents,
   DirectoryEntry,
   DirectoryEntryType,
   ReadBinaryFromFileOptions,
@@ -50,7 +51,7 @@ function denoReadBinaryFromFile(
 async function denoReadDirectoryContents(
   path: URL,
   options?: ReadDirectoryContentsOptions,
-): Promise<DirectoryEntry[]> {
+): Promise<DirectoryContents> {
   const entries: DirectoryEntry[] = [];
 
   const pathWithSlash = new URL(path.href + "/");
@@ -65,7 +66,7 @@ async function denoReadDirectoryContents(
       type: await dirEntryToType(dirEntry, entryUrl, options),
     });
   }
-  return entries;
+  return { entries };
 }
 
 export function makeDenoPlatform(): Platform {

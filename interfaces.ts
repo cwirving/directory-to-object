@@ -70,6 +70,28 @@ export interface DirectoryEntry {
 }
 
 /**
+ * The directory contents returned by the {@link FileSystemReader}
+ * {@linkcode FileSystemReader.loadDirectoryContents | loadDirectoryContents} method.
+ *
+ * The file system reader implementation may allocate resources associated with the directory listing. The
+ * {@linkcode dispose} optional method, when present, should be called by the consumer to dispose of these resources.
+ */
+export interface DirectoryContents {
+  /**
+   * The directory entries.
+   *
+   * This is an array of **mutable** objects implementing the {@link DirectoryEntry} interface, each
+   * representing a file/directory in the directory. The directory loader may mutate both arrays and items as needed.
+   */
+  entries: DirectoryEntry[];
+
+  /**
+   * Optional method to dispose of any resources allocated as part of listing directory contents.
+   */
+  dispose?: () => void;
+}
+
+/**
  * Options passed to the {@link FileSystemReader} {@linkcode FileSystemReader.loadDirectoryContents | loadDirectoryContents} method.
  */
 export interface ReadDirectoryContentsOptions extends WithOptionalSignal {
@@ -118,17 +140,17 @@ export interface FileSystemReader {
   ): Promise<Uint8Array>;
 
   /**
-   * Asynchronously read a directory's contents and return it as an array of objects implementing
+   * Asynchronously read a directory's contents and return them, including an array of objects implementing
    * the {@link DirectoryEntry} interface.
    *
    * @param path The URL of the directory to read.
    * @param options Options to apply to the reader.
-   * @returns A promise to an array of **mutable** objects implementing the {@link DirectoryEntry} interface, each representing a file/directory in the directory. The directory loader may mutate both arrays and items as needed.
+   * @returns A promise to the directory contents.
    */
   readDirectoryContents(
     path: URL,
     options?: Readonly<ReadDirectoryContentsOptions>,
-  ): Promise<DirectoryEntry[]>;
+  ): Promise<DirectoryContents>;
 }
 
 /**

@@ -1,4 +1,5 @@
 import type {
+  DirectoryContents,
   DirectoryEntry,
   FileSystemReader,
   ReadBinaryFromFileOptions,
@@ -19,12 +20,14 @@ export interface ReadTextFromFileCall {
 export interface ReadDirectoryContentsCall {
   path: URL;
   options?: Readonly<ReadDirectoryContentsOptions>;
+  disposed: boolean;
 }
 
 export interface MockFileSystemReaderContents {
   binaryFiles: Record<string, Uint8Array>;
   textFiles: Record<string, string>;
   directories: Record<string, DirectoryEntry[]>;
+  withDispose?: boolean;
 }
 
 export class MockFileSystemReader implements FileSystemReader {
@@ -34,6 +37,7 @@ export class MockFileSystemReader implements FileSystemReader {
     textFiles: {},
     directories: {},
   };
+  withDispose: boolean;
 
   calls: {
     readBinaryFromFile: ReadBinaryFromFileCall[];
@@ -48,6 +52,7 @@ export class MockFileSystemReader implements FileSystemReader {
   constructor(name: string, contents: MockFileSystemReaderContents) {
     this.name = name;
     this.contents = contents;
+    this.withDispose = !!contents.withDispose;
   }
 
   readBinaryFromFile(
@@ -83,15 +88,28 @@ export class MockFileSystemReader implements FileSystemReader {
   readDirectoryContents(
     path: URL,
     options?: Readonly<ReadDirectoryContentsOptions>,
-  ): Promise<DirectoryEntry[]> {
-    this.calls.readDirectoryContents.push({ path, options });
+  ): Promise<DirectoryContents> {
+    const callEntry: ReadDirectoryContentsCall = {
+      path,
+      options,
+      disposed: false,
+    };
+    this.calls.readDirectoryContents.push(callEntry);
 
-    const result = this.contents.directories[path.href];
-    if (result === undefined) {
+    const entries = this.contents.directories[path.href];
+    if (entries === undefined) {
       return Promise.reject(
         new Error(`No directory contents for ${path.href}`),
       );
     }
-    return Promise.resolve(result);
+
+    return (this.withDispose)
+      ? Promise.resolve({
+        entries,
+        dispose: () => {
+          callEntry.disposed = true;
+        },
+      })
+      : Promise.resolve({ entries });
   }
 }

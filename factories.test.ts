@@ -87,10 +87,10 @@ test("newFileSystemReader: read a directory (no options)", async () => {
     testDirectoryUrl,
   );
 
-  assertEquals(directoryContents.length, 5);
+  assertEquals(directoryContents.entries.length, 5);
 
   const entryMap = new Map<string, DirectoryEntry>();
-  for (const entry of directoryContents) {
+  for (const entry of directoryContents.entries) {
     entryMap.set(entry.name, entry);
   }
 
@@ -118,10 +118,10 @@ test("newFileSystemReader: read a directory (include symlinks)", async () => {
     { includeSymlinks: true },
   );
 
-  assertEquals(directoryContents.length, 5);
+  assertEquals(directoryContents.entries.length, 5);
 
   const entryMap = new Map<string, DirectoryEntry>();
-  for (const entry of directoryContents) {
+  for (const entry of directoryContents.entries) {
     entryMap.set(entry.name, entry);
   }
 

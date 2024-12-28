@@ -115,14 +115,15 @@ abstract class DirectoryValueLoader
     const contents = await actualFileSystemReader.readDirectoryContents(
       entry.url,
       options,
-    ) as DirectoryEntryWithLoadingDecision[];
+    );
+    const entries = contents.entries as DirectoryEntryWithLoadingDecision[];
 
     const propertyNameDecoder = mergedOptions?.propertyNameDecoder ??
       ((name) => name);
 
     // Step 1: look at all the directory entries and decide which loader can handle them, what their resulting key
     // will be, etc. But DO NOT load them yet.
-    for (const directoryEntry of contents) {
+    for (const directoryEntry of entries) {
       directoryEntry.relativePath =
         `${entry.relativePath}/${directoryEntry.name}`;
       let loaded = false;
@@ -153,11 +154,11 @@ abstract class DirectoryValueLoader
     }
 
     // Step 2: sort the directory entries by decoded key.
-    contents.sort((a, b) => numberAwareComparison(a.decodedKey, b.decodedKey));
+    entries.sort((a, b) => numberAwareComparison(a.decodedKey, b.decodedKey));
 
     // Step 3: Load the entries in order.
     let index = 0;
-    for (const directoryEntry of contents) {
+    for (const directoryEntry of entries) {
       if (directoryEntry.key !== undefined) {
         const value = await directoryEntry.loader.loadValue(
           directoryEntry,
@@ -183,6 +184,7 @@ abstract class DirectoryValueLoader
     // If the caller has requested that we embed directory URLs, do it:
     this.embedDirectoryUrl(result, entry, options);
 
+    contents.dispose?.();
     return result;
   }
 

@@ -86,6 +86,14 @@ export interface DirectoryContents {
   entries: DirectoryEntry[];
 
   /**
+   * If present, this is the file system reader that must be used to read the contents of this directory.
+   *
+   * For example, file system readers that introspect the contents archive files may return a new reader for each
+   * specific archive file.
+   */
+  innerFileSystemReader?: FileSystemReader;
+
+  /**
    * Optional method to dispose of any resources allocated as part of listing directory contents.
    */
   dispose?: () => void;

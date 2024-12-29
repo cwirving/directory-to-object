@@ -28,6 +28,7 @@ export interface MockFileSystemReaderContents {
   textFiles: Record<string, string>;
   directories: Record<string, DirectoryEntry[]>;
   withDispose?: boolean;
+  innerFileSystemReader?: FileSystemReader;
 }
 
 export class MockFileSystemReader implements FileSystemReader {
@@ -38,6 +39,7 @@ export class MockFileSystemReader implements FileSystemReader {
     directories: {},
   };
   withDispose: boolean;
+  innerFileSystemReader: FileSystemReader | undefined;
 
   calls: {
     readBinaryFromFile: ReadBinaryFromFileCall[];
@@ -53,6 +55,7 @@ export class MockFileSystemReader implements FileSystemReader {
     this.name = name;
     this.contents = contents;
     this.withDispose = !!contents.withDispose;
+    this.innerFileSystemReader = contents.innerFileSystemReader;
   }
 
   readBinaryFromFile(
@@ -109,7 +112,11 @@ export class MockFileSystemReader implements FileSystemReader {
         dispose: () => {
           callEntry.disposed = true;
         },
+        innerFileSystemReader: this.innerFileSystemReader,
       })
-      : Promise.resolve({ entries });
+      : Promise.resolve({
+        entries,
+        innerFileSystemReader: this.innerFileSystemReader,
+      });
   }
 }

@@ -12,6 +12,7 @@ import {
 } from "./directory_loader.ts";
 import { MockFileSystemReader } from "./mocks/file_system_reader.mock.ts";
 import { isRecord } from "./is_record.ts";
+import { newLoaderBuilder } from "./factories.ts";
 
 const neverCalledValueLoader: ValueLoader<unknown> = {
   name: "never called",
@@ -31,7 +32,7 @@ const neverCalledValueLoader: ValueLoader<unknown> = {
   },
 };
 
-test("Directory loader honors loader iteration order", async () => {
+test("Directory loader honors loader order", async () => {
   const loader1 = new MockValueLoader("loader 1", {
     contents: { "file:///foo.c": 1 },
     canLoadValue: (entry) => entry.name.endsWith(".c"),
@@ -189,6 +190,48 @@ test("Directory loader honors loader iteration order", async () => {
 
   assertEquals(loader3.calls.loadValue[0].entry.name, "foo.a.b.c");
   assertEquals(loader3.calls.loadValue[0].options, options3);
+});
+
+test("Directory loader uses inner file system reader", async () => {
+  const innerReader = new MockFileSystemReader("inner reader", {
+    binaryFiles: {},
+    directories: {},
+    textFiles: {
+      "file:///foo.txt": "xyz",
+    },
+  });
+  const outerReader = new MockFileSystemReader("inner reader", {
+    binaryFiles: {},
+    directories: {
+      "file:///": [{
+        name: "foo.txt",
+        type: "file",
+        url: new URL("file:///foo.txt"),
+      }],
+    },
+    textFiles: {},
+    innerFileSystemReader: innerReader,
+  });
+
+  const loaderBuilder = newLoaderBuilder(outerReader);
+
+  const dv = new DirectoryObjectValueLoader(
+    "directory loader",
+    loaderBuilder.defaults(),
+    outerReader,
+  );
+
+  const entry: DirectoryEntryInContext = {
+    name: "",
+    relativePath: "",
+    url: new URL("file:///"),
+    type: "directory",
+  };
+
+  const returned = await dv.loadValue(entry);
+  assertEquals(returned, {
+    "foo": "xyz",
+  });
 });
 
 test("DirectoryValueLoader honors options", async () => {

@@ -117,75 +117,90 @@ abstract class DirectoryValueLoader
       options,
     );
     const entries = contents.entries as DirectoryEntryWithLoadingDecision[];
-
     const propertyNameDecoder = mergedOptions?.propertyNameDecoder ??
       ((name) => name);
 
-    // Step 1: look at all the directory entries and decide which loader can handle them, what their resulting key
-    // will be, etc. But DO NOT load them yet.
-    for (const directoryEntry of entries) {
-      directoryEntry.relativePath =
-        `${entry.relativePath}/${directoryEntry.name}`;
-      let loaded = false;
+    try {
+      // The options passed to inner loaders need to include any file system reader included in the contents.
+      const innerOptions = contents.innerFileSystemReader
+        ? mergeOptions(mergedOptions, {
+          fileSystemReader: contents.innerFileSystemReader,
+        })
+        : mergedOptions;
 
-      for (const loader of this.#loaders) {
-        const canLoadEntryMaybePromise = loader.canLoadValue(directoryEntry);
-        if (
-          (canLoadEntryMaybePromise instanceof Promise)
-            ? await canLoadEntryMaybePromise
-            : canLoadEntryMaybePromise
-        ) {
-          directoryEntry.loader = loader;
-          const key = loader.computeKey(directoryEntry);
-          directoryEntry.key = key;
-          directoryEntry.decodedKey = (key !== undefined)
-            ? propertyNameDecoder(key)
-            : undefined;
-          loaded = true;
-          break;
+      // Step 1: look at all the directory entries and decide which loader can handle them, what their resulting key
+      // will be, etc. But DO NOT load them yet.
+      for (const directoryEntry of entries) {
+        directoryEntry.relativePath =
+          `${entry.relativePath}/${directoryEntry.name}`;
+        let loaded = false;
+
+        for (const loader of this.#loaders) {
+          const canLoadEntryMaybePromise = loader.canLoadValue(directoryEntry);
+          if (
+            (canLoadEntryMaybePromise instanceof Promise)
+              ? await canLoadEntryMaybePromise
+              : canLoadEntryMaybePromise
+          ) {
+            directoryEntry.loader = loader;
+            const key = loader.computeKey(directoryEntry);
+            directoryEntry.key = key;
+            directoryEntry.decodedKey = (key !== undefined)
+              ? propertyNameDecoder(key)
+              : undefined;
+            loaded = true;
+            break;
+          }
+        }
+
+        if (mergedOptions?.strict && !loaded) {
+          throw new Error(
+            `Directory entry at "${directoryEntry.url}" cannot be loaded`,
+          );
         }
       }
 
-      if (mergedOptions?.strict && !loaded) {
-        throw new Error(
-          `Directory entry at "${directoryEntry.url}" cannot be loaded`,
-        );
-      }
-    }
+      // Step 2: sort the directory entries by decoded key.
+      entries.sort((a, b) => numberAwareComparison(a.decodedKey, b.decodedKey));
 
-    // Step 2: sort the directory entries by decoded key.
-    entries.sort((a, b) => numberAwareComparison(a.decodedKey, b.decodedKey));
+      // Step 3: Load the entries in order.
+      let index = 0;
+      for (const directoryEntry of entries) {
+        if (directoryEntry.key !== undefined) {
+          const value = await directoryEntry.loader.loadValue(
+            directoryEntry,
+            innerOptions,
+          );
+          const decodedKey = ensureIsDefined(directoryEntry.decodedKey);
 
-    // Step 3: Load the entries in order.
-    let index = 0;
-    for (const directoryEntry of entries) {
-      if (directoryEntry.key !== undefined) {
-        const value = await directoryEntry.loader.loadValue(
-          directoryEntry,
-          mergedOptions,
-        );
-        const decodedKey = ensureIsDefined(directoryEntry.decodedKey);
+          // If the caller has requested that we embed file URLs, do it:
+          if (
+            directoryEntry.type === "file" && isRecord(value) &&
+            typeof mergedOptions?.embedFileUrlAs === "string"
+          ) {
+            value[mergedOptions.embedFileUrlAs] = directoryEntry.url;
+          }
 
-        // If the caller has requested that we embed file URLs, do it:
-        if (
-          directoryEntry.type === "file" && isRecord(value) &&
-          typeof mergedOptions?.embedFileUrlAs === "string"
-        ) {
-          value[mergedOptions.embedFileUrlAs] = directoryEntry.url;
+          // Set the value, with variations depending on this being an array or object.
+          index = this.setValue(
+            result,
+            decodedKey,
+            index,
+            value,
+            mergedOptions,
+          );
+
+          ++index;
         }
-
-        // Set the value, with variations depending on this being an array or object.
-        index = this.setValue(result, decodedKey, index, value, mergedOptions);
-
-        ++index;
       }
+
+      // If the caller has requested that we embed directory URLs, do it:
+      this.embedDirectoryUrl(result, entry, options);
+
+      return result;
+    } finally {
+      contents.dispose?.();
     }
-
-    // If the caller has requested that we embed directory URLs, do it:
-    this.embedDirectoryUrl(result, entry, options);
-
-    contents.dispose?.();
-    return result;
   }
 
   // Embed the directory URL in te result, if requested and it is contextually appropriate.

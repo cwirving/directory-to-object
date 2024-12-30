@@ -55,14 +55,19 @@ function nodeReadTextFromFile(
   });
 }
 
-function nodeReadBinaryFromFile(
+async function nodeReadBinaryFromFile(
   path: URL,
   options?: ReadBinaryFromFileOptions,
 ): Promise<Uint8Array> {
-  return fsPromises.readFile(path, {
+  const buffer = await fsPromises.readFile(path, {
     encoding: null,
     signal: (options as Abortable | undefined)?.signal,
-  }) as unknown as Promise<Uint8Array>;
+  });
+
+  // Because, despite the superficial compatibility, Node.js' `Buffer` type is not fully
+  // compatible with `Uint8Array` (notably the `slice` method).
+  // See https://nodejs.org/api/buffer.html#buffers-and-typedarrays for some of the incompatibilities.
+  return new Uint8Array(buffer);
 }
 
 async function nodeReadDirectoryContents(

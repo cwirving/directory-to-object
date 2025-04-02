@@ -170,18 +170,6 @@ export interface FileValueLoaderOptions
 }
 
 /**
- * Interface of a file value loader.
- *
- * File value loaders, as opposed to _readers_ encapsulate reading files **and** their
- * interpretation as a given format. For example, a file value loader may read a file as text and
- * parse the text as JSON, producing a JavaScript primitive value.
- *
- * While this library only contains loaders for plain text, binary data and JSON files, consumers
- * can create their own loaders for any format they choose and represent the loaded result as any
- * JavaScript value.
- */
-
-/**
  * The signature of a merge function used by the directory object loader to merge array and
  * plain JavaScript object values in loaded objects.
  *
@@ -272,9 +260,16 @@ export interface DirectoryEntryInContext extends DirectoryEntry {
 }
 
 /**
- * Interface of a value loader.
+ * Interface of value loaders. This applies to both file and directory value loaders.
  *
- * TODO: fix this documentation
+ * File value loaders, as opposed to _readers_ encapsulate reading files **and** their
+ * interpretation as a given format. For example, a file value loader may read a file as text and
+ * parse the text as JSON, producing a JavaScript primitive value.
+ *
+ * While this library only contains loaders for plain text, binary data and JSON files, consumers
+ * can create their own loaders for any format they choose and represent the loaded result as any
+ * JavaScript value.
+ *
  * Directory object loaders read the contents of a directory specified by its URL into a plain JavasScript object.
  * The exact behavior depends on the loader, but the standard behavior implemented in this library is to
  * list directory contents, use registered file value loaders to load the individual files in the directory and

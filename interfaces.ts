@@ -489,8 +489,19 @@ export interface FluentLoader<TValue> extends ValueLoader<TValue> {
   ): Promise<TValue>;
 }
 
+/**
+ * Options passed to file value loader builder methods.
+ */
 export interface FileLoaderBuildOptions {
+  /**
+   * The file extension that the value loader matches. Omit the extension to build a value
+   * loader that matches all file extensions.
+   */
   extension?: string;
+
+  /**
+   * The name of the file value builder. If omitted, a default name will be used.
+   */
   name?: string;
 }
 
